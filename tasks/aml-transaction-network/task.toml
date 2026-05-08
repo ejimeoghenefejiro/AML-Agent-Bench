@@ -1,0 +1,8 @@
+id = "aml-transaction-network"
+name = "AML Transaction Network"
+difficulty = "hard"
+tags = ["fintech", "aml", "network-analysis", "financial-crime", "agent-evaluation"]
+
+description = "Evaluate whether an AI agent can perform graph-based AML transaction clustering and evidence-based risk scoring from synthetic financial transfer data."
+
+expected_output = "/app/aml_clusters.csv"
