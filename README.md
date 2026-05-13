@@ -15,6 +15,12 @@ Existing agent benchmarks mostly test general coding, tool use, or broad reasoni
 
 This repository provides a focused benchmark artifact for evaluating AI agents on AML transaction-network tasks.
 
+The **reference agent** is implemented in **C# with Microsoft Semantic Kernel**
+(`agents/csharp-sk/`) and is the primary subject of the PhD investigation. The
+harness (`harness/run_agent.py`) is intentionally language-agnostic: any agent
+that can be packaged as a Docker image and read `instruction.md` from `/app`
+can be benchmarked against the same tasks, enabling cross-language comparison.
+
 ## Thesis positioning
 
 A possible PhD framing:
@@ -32,6 +38,18 @@ A possible PhD framing:
 ```text
 AML-Agent-Bench/
 ├── README.md
+├── agents/
+│   ├── README.md
+│   └── csharp-sk/                # primary PhD agent (C# + Semantic Kernel)
+│       ├── Dockerfile
+│       ├── AmlAgent.csproj
+│       ├── Program.cs
+│       └── Tools/
+│           ├── FileTools.cs
+│           └── ShellTool.cs
+├── harness/
+│   ├── README.md
+│   └── run_agent.py              # Docker-sandboxed runner (any language)
 ├── docs/
 │   └── research-problem.md
 ├── scripts/
@@ -44,7 +62,7 @@ AML-Agent-Bench/
         │   ├── Dockerfile
         │   └── data/
         │       └── transfers.csv
-        ├── solution/
+        ├── solution/             # reference oracle (not the agent)
         │   ├── solve.sh
         │   └── solve.py
         └── tests/
@@ -52,7 +70,19 @@ AML-Agent-Bench/
             └── test_outputs.py
 ```
 
-## Running the reference solution locally
+## Running the C# / Semantic Kernel agent
+
+```bash
+export OPENAI_API_KEY=sk-...
+python harness/run_agent.py --agent csharp-sk --task aml-transaction-network
+```
+
+The harness builds the agent image, runs it in a sandboxed container against
+the task's data, then runs the task tests in a fresh container against the
+agent's output. See `harness/README.md` and `agents/README.md` for details on
+plugging in agents written in other languages.
+
+## Running the reference oracle locally
 
 From the task directory:
 
