@@ -1,4 +1,5 @@
 using AmlAgent.Agent;
+using AmlAgent.Config;
 
 namespace AmlAgent;
 
@@ -6,6 +7,10 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        var envFile = DotEnv.Load();
+        if (envFile is not null)
+            Console.WriteLine($"[env] loaded {envFile}");
+
         if (args.Length == 0)
         {
             PrintUsage();
@@ -19,6 +24,7 @@ public static class Program
         {
             "run"   => await BenchmarkAgent.RunAsync(rest),
             "chat"  => await ChatAgent.RunAsync(rest),
+            "judge" => await JudgeAgent.RunAsync(rest),
             "-h" or "--help" or "help" => Help(),
             _ => Unknown(cmd),
         };
@@ -38,8 +44,9 @@ public static class Program
         Console.WriteLine("aml-agent — C# / Semantic Kernel agent for AML-Agent-Bench");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  aml-agent run                 Run the benchmark loop (reads instruction.md from BENCH_TASK_DIR)");
-        Console.WriteLine("  aml-agent chat [--task <id>]  Interactive CMD chat REPL for local testing");
+        Console.WriteLine("  aml-agent run                                     Run the benchmark loop (reads instruction.md or prompt.md)");
+        Console.WriteLine("  aml-agent chat [--task <id>]                      Interactive CMD chat REPL for local testing");
+        Console.WriteLine("  aml-agent judge --task <id> --workspace <path>    Score a benchmark workspace via LLM-as-judge rubric");
         Console.WriteLine();
         Console.WriteLine("Environment:");
         Console.WriteLine("  OPENAI_API_KEY    (required)");

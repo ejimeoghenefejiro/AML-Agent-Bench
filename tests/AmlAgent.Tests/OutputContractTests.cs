@@ -19,6 +19,10 @@ public class OutputContractTests
     {
         var ws = Environment.GetEnvironmentVariable("AML_BENCH_WORKSPACE");
         if (string.IsNullOrEmpty(ws)) return null;
+        // Heuristic: only apply Task 001 contract tests when the workspace
+        // contains Task 001's data (transfers.csv). Other tasks have their
+        // own test classes.
+        if (!File.Exists(Path.Combine(ws, "data", "transfers.csv"))) return null;
         return Path.Combine(ws, "aml_clusters.csv");
     }
 
@@ -32,7 +36,7 @@ public class OutputContractTests
     public void OutputFileExists()
     {
         var path = WorkspaceOutput();
-        Skip.If(path is null, "AML_BENCH_WORKSPACE not set");
+        Skip.If(path is null, "not a Task 001 workspace");
         Assert.True(File.Exists(path), $"Expected output at {path}");
     }
 

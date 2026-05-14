@@ -4,15 +4,22 @@ using AmlAgent.Oracle;
 namespace AmlAgent.Harness;
 
 /// <summary>
-/// Language-agnostic Docker-based benchmark runner. Builds an agent image,
-/// stages a temp workspace with the task's data + instruction.md, runs the
-/// agent container, then runs the xUnit test project on the host against the
-/// workspace via AML_BENCH_WORKSPACE.
+/// Language-agnostic Docker-based benchmark runner. The agent under test can
+/// come from three sources, in priority order:
 ///
-/// Although the primary agent is C# + Semantic Kernel, the harness only
-/// requires that an agent image read instruction.md from /app and exit 0 —
-/// any language's agent can be benchmarked by dropping a Dockerfile under
-/// agents/&lt;name&gt;/.
+///   --agent-image &lt;tag&gt;      a pre-built Docker image (no build step)
+///   --submission   &lt;path&gt;     a local folder containing a Dockerfile
+///   --agent        &lt;name&gt;     a subfolder of agents/ in the repo (default)
+///
+/// The harness stages a temp workspace from tasks/&lt;task&gt;/environment/ +
+/// the task's instruction.md/prompt.md, runs the agent container against /app,
+/// and then evaluates the workspace with:
+///
+///   1. xUnit (AmlAgent.Tests) — structural / deterministic assertions
+///   2. aml-agent judge — LLM-as-judge rubric scoring, if the task has rubric.json
+///
+/// Either evaluator failing causes a non-zero overall exit code, but both are
+/// always attempted so users see the full picture.
 /// </summary>
 public static class Program
 {
@@ -21,21 +28,27 @@ public static class Program
         string agent = "csharp-sk";
         string task = "aml-transaction-network";
         string? model = null;
+        string? agentImage = null;
+        string? submission = null;
         int maxSteps = 25;
         bool keepWorkspace = false;
         bool useOracle = false;
+        bool skipJudge = false;
 
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
-                case "--agent" when i + 1 < args.Length: agent = args[++i]; break;
-                case "--task"  when i + 1 < args.Length: task = args[++i]; break;
-                case "--model" when i + 1 < args.Length: model = args[++i]; break;
-                case "--max-steps" when i + 1 < args.Length: maxSteps = int.Parse(args[++i]); break;
+                case "--agent"        when i + 1 < args.Length: agent = args[++i]; break;
+                case "--agent-image"  when i + 1 < args.Length: agentImage = args[++i]; break;
+                case "--submission"   when i + 1 < args.Length: submission = args[++i]; break;
+                case "--task"         when i + 1 < args.Length: task = args[++i]; break;
+                case "--model"        when i + 1 < args.Length: model = args[++i]; break;
+                case "--max-steps"    when i + 1 < args.Length: maxSteps = int.Parse(args[++i]); break;
                 case "--keep-workspace": keepWorkspace = true; break;
-                case "--oracle": useOracle = true; break;
-                case "-h" or "--help": PrintUsage(); return 0;
+                case "--oracle":         useOracle = true; break;
+                case "--no-judge":       skipJudge = true; break;
+                case "-h" or "--help":   PrintUsage(); return 0;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {args[i]}");
                     PrintUsage();
@@ -46,23 +59,27 @@ public static class Program
         var repoRoot = FindRepoRoot()
             ?? throw new InvalidOperationException("Could not locate repo root (looking for AML-Agent-Bench.sln)");
 
-        var agentDir = Path.Combine(repoRoot, "agents", agent);
-        var taskDir  = Path.Combine(repoRoot, "tasks", task);
-        if (!Directory.Exists(agentDir)) { Console.Error.WriteLine($"agent not found: {agentDir}"); return 1; }
-        if (!Directory.Exists(taskDir))  { Console.Error.WriteLine($"task not found: {taskDir}");  return 1; }
+        var taskDir = Path.Combine(repoRoot, "tasks", task);
+        if (!Directory.Exists(taskDir)) { Console.Error.WriteLine($"task not found: {taskDir}"); return 1; }
 
         var workspace = Path.Combine(Path.GetTempPath(), $"aml-bench-{task}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(workspace);
         try
         {
             StageWorkspace(taskDir, workspace);
-            Console.WriteLine($"[harness] workspace: {workspace}");
+            Console.WriteLine($"[harness] task     = {task}");
+            Console.WriteLine($"[harness] workspace = {workspace}");
 
             int agentRc;
             if (useOracle)
             {
                 Console.WriteLine("[harness] --oracle: producing output via AmlAgent.Oracle (skipping agent container)");
-                var input  = Path.Combine(workspace, "data", "transfers.csv");
+                if (task != "aml-transaction-network")
+                {
+                    Console.Error.WriteLine("[harness] --oracle is only implemented for aml-transaction-network");
+                    return 1;
+                }
+                var input = Path.Combine(workspace, "data", "transfers.csv");
                 var output = Path.Combine(workspace, "aml_clusters.csv");
                 var res = OracleRunner.Run(input, output);
                 Console.WriteLine($"[harness] oracle wrote {res.ClustersWritten} clusters");
@@ -73,16 +90,38 @@ public static class Program
                 var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
                     ?? throw new InvalidOperationException("OPENAI_API_KEY not set");
 
-                var agentImage = BuildAgentImage(agent, agentDir);
-                agentRc = RunAgentContainer(agentImage, workspace, apiKey, model, maxSteps);
+                string image = ResolveAgentImage(repoRoot, agent, agentImage, submission);
+                agentRc = RunAgentContainer(image, workspace, apiKey, model, maxSteps);
                 Console.WriteLine($"[harness] agent exit code: {agentRc}");
             }
 
+            // 1) xUnit structural tests
             var testsProj = Path.Combine(repoRoot, "tests", "AmlAgent.Tests", "AmlAgent.Tests.csproj");
-            Console.WriteLine($"\n[harness] running tests against workspace");
+            Console.WriteLine($"\n[harness] running xUnit tests against workspace");
             var testRc = RunDotnetTest(testsProj, workspace);
-            Console.WriteLine($"[harness] tests exit code: {testRc}");
-            return testRc;
+            Console.WriteLine($"[harness] xUnit exit code: {testRc}");
+
+            // 2) Judge rubric (if present)
+            int judgeRc = 0;
+            var rubricPath = Path.Combine(taskDir, "rubric.json");
+            if (!skipJudge && File.Exists(rubricPath))
+            {
+                Console.WriteLine($"\n[harness] running aml-agent judge against workspace");
+                judgeRc = RunJudge(repoRoot, task, workspace);
+                Console.WriteLine($"[harness] judge exit code: {judgeRc}");
+            }
+            else if (skipJudge)
+            {
+                Console.WriteLine("[harness] --no-judge: skipping LLM judge");
+            }
+            else
+            {
+                Console.WriteLine("[harness] no rubric.json for this task — judge stage skipped");
+            }
+
+            var overall = (testRc == 0 && judgeRc == 0) ? 0 : 1;
+            Console.WriteLine($"\n[harness] OVERALL: {(overall == 0 ? "PASS" : "FAIL")} (xunit={testRc} judge={judgeRc})");
+            return overall;
         }
         finally
         {
@@ -96,31 +135,71 @@ public static class Program
         Console.WriteLine("aml-harness — Docker-based benchmark runner");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  aml-harness [--agent <name>] [--task <id>] [--model <id>]");
-        Console.WriteLine("              [--max-steps <n>] [--keep-workspace] [--oracle]");
+        Console.WriteLine("  aml-harness [agent-source] [--task <id>] [options]");
         Console.WriteLine();
-        Console.WriteLine("Options:");
-        Console.WriteLine("  --agent           agent dir under agents/        (default: csharp-sk)");
-        Console.WriteLine("  --task            task dir under tasks/          (default: aml-transaction-network)");
-        Console.WriteLine("  --model           override BENCH_MODEL           (default: gpt-4o-mini)");
-        Console.WriteLine("  --max-steps       cap on agent turns             (default: 25)");
-        Console.WriteLine("  --keep-workspace  keep temp workspace on exit");
-        Console.WriteLine("  --oracle          use AmlAgent.Oracle instead of running the agent container");
+        Console.WriteLine("Agent source (pick one):");
+        Console.WriteLine("  --agent <name>           subfolder of agents/ in this repo (default: csharp-sk)");
+        Console.WriteLine("  --agent-image <tag>      use a pre-built Docker image as the agent");
+        Console.WriteLine("  --submission <path>      build the Dockerfile in a local folder (user upload)");
+        Console.WriteLine();
+        Console.WriteLine("Other options:");
+        Console.WriteLine("  --task <id>              task dir under tasks/ (default: aml-transaction-network)");
+        Console.WriteLine("  --model <id>             override BENCH_MODEL for the agent container");
+        Console.WriteLine("  --max-steps <n>          cap on agent turns (default: 25)");
+        Console.WriteLine("  --keep-workspace         keep the temp workspace dir after exit");
+        Console.WriteLine("  --oracle                 use AmlAgent.Oracle instead of running an agent container");
+        Console.WriteLine("                           (only valid for task=aml-transaction-network)");
+        Console.WriteLine("  --no-judge               skip the LLM-as-judge rubric stage");
+    }
+
+    private static string ResolveAgentImage(string repoRoot, string agent, string? agentImage, string? submission)
+    {
+        if (!string.IsNullOrEmpty(agentImage))
+        {
+            Console.WriteLine($"[harness] using pre-built agent image: {agentImage}");
+            return agentImage;
+        }
+        if (!string.IsNullOrEmpty(submission))
+        {
+            var subDir = Path.GetFullPath(submission);
+            if (!Directory.Exists(subDir))
+                throw new InvalidOperationException($"submission path not found: {subDir}");
+            if (!File.Exists(Path.Combine(subDir, "Dockerfile")))
+                throw new InvalidOperationException($"no Dockerfile in submission: {subDir}");
+            var tag = $"aml-bench-submission-{Path.GetFileName(subDir).ToLowerInvariant()}:latest";
+            var rc = RunProcess("docker", new[] { "build", "-t", tag, subDir });
+            if (rc != 0) throw new InvalidOperationException("submission image build failed");
+            return tag;
+        }
+        var agentDir = Path.Combine(repoRoot, "agents", agent);
+        if (!Directory.Exists(agentDir))
+            throw new InvalidOperationException($"agent not found: {agentDir}");
+        var defaultTag = $"aml-bench-agent-{agent}:latest";
+        var brc = RunProcess("docker", new[] { "build", "-t", defaultTag, agentDir });
+        if (brc != 0) throw new InvalidOperationException("agent image build failed");
+        return defaultTag;
     }
 
     private static void StageWorkspace(string taskDir, string workspace)
     {
         var envSrc = Path.Combine(taskDir, "environment");
-        foreach (var entry in Directory.GetFileSystemEntries(envSrc))
+        if (Directory.Exists(envSrc))
         {
-            var name = Path.GetFileName(entry);
-            var dest = Path.Combine(workspace, name);
-            if (Directory.Exists(entry)) CopyDir(entry, dest);
-            else File.Copy(entry, dest, overwrite: true);
+            foreach (var entry in Directory.GetFileSystemEntries(envSrc))
+            {
+                var name = Path.GetFileName(entry);
+                var dest = Path.Combine(workspace, name);
+                if (Directory.Exists(entry)) CopyDir(entry, dest);
+                else File.Copy(entry, dest, overwrite: true);
+            }
         }
-        File.Copy(Path.Combine(taskDir, "instruction.md"),
-                  Path.Combine(workspace, "instruction.md"),
-                  overwrite: true);
+        // Stage all .md task files (instruction.md, prompt.md, expected-behaviour.md, tests.md)
+        foreach (var name in new[] { "instruction.md", "prompt.md", "expected-behaviour.md", "tests.md" })
+        {
+            var src = Path.Combine(taskDir, name);
+            if (File.Exists(src))
+                File.Copy(src, Path.Combine(workspace, name), overwrite: true);
+        }
     }
 
     private static void CopyDir(string src, string dst)
@@ -130,14 +209,6 @@ public static class Program
             File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), overwrite: true);
         foreach (var d in Directory.GetDirectories(src))
             CopyDir(d, Path.Combine(dst, Path.GetFileName(d)));
-    }
-
-    private static string BuildAgentImage(string agent, string agentDir)
-    {
-        var tag = $"aml-bench-agent-{agent}:latest";
-        var rc = RunProcess("docker", new[] { "build", "-t", tag, agentDir });
-        if (rc != 0) throw new InvalidOperationException("agent image build failed");
-        return tag;
     }
 
     private static int RunAgentContainer(string image, string workspace, string apiKey, string? model, int maxSteps)
@@ -163,6 +234,16 @@ public static class Program
     {
         var env = new Dictionary<string, string> { ["AML_BENCH_WORKSPACE"] = workspace };
         return RunProcess("dotnet", new[] { "test", testsProj, "--nologo", "-v", "minimal" }, env);
+    }
+
+    private static int RunJudge(string repoRoot, string task, string workspace)
+    {
+        var agentProj = Path.Combine(repoRoot, "agents", "csharp-sk", "AmlAgent.csproj");
+        return RunProcess("dotnet", new[]
+        {
+            "run", "--project", agentProj, "--no-build", "--",
+            "judge", "--task", task, "--workspace", workspace
+        });
     }
 
     private static int RunProcess(string file, IEnumerable<string> args, IDictionary<string, string>? env = null)

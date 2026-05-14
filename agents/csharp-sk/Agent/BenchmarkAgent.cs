@@ -10,10 +10,10 @@ internal static class BenchmarkAgent
     {
         var taskDir = Environment.GetEnvironmentVariable("BENCH_TASK_DIR") ?? "/app";
         var maxSteps = int.Parse(Environment.GetEnvironmentVariable("BENCH_MAX_STEPS") ?? "25");
-        var instructionPath = Path.Combine(taskDir, "instruction.md");
-        if (!File.Exists(instructionPath))
+        var instructionPath = ResolveInstructionFile(taskDir);
+        if (instructionPath is null)
         {
-            Console.Error.WriteLine($"Missing instruction file: {instructionPath}");
+            Console.Error.WriteLine($"Missing instruction file in {taskDir}: expected instruction.md or prompt.md");
             return 2;
         }
 
@@ -52,5 +52,15 @@ internal static class BenchmarkAgent
 
         Console.Error.WriteLine($"Agent exhausted {maxSteps} steps without DONE.");
         return 1;
+    }
+
+    private static string? ResolveInstructionFile(string taskDir)
+    {
+        foreach (var name in new[] { "instruction.md", "prompt.md" })
+        {
+            var p = Path.Combine(taskDir, name);
+            if (File.Exists(p)) return p;
+        }
+        return null;
     }
 }
