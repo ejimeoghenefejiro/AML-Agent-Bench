@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.SemanticKernel;
 
@@ -11,18 +12,31 @@ public sealed class ShellTool
 
     public ShellTool(string cwd) => _cwd = cwd;
 
-    [KernelFunction, Description("Run a shell command (bash -lc) inside the sandbox and return combined stdout/stderr and exit code. Use for `python`, `ls`, `cat`, `pytest`, etc.")]
+    [KernelFunction, Description("Run a shell command in the sandbox and return combined stdout/stderr + exit code. Examples: `dotnet script solve.csx`, `ls`, `cat file`.")]
     public async Task<string> Run(
         [Description("Shell command to execute")] string command,
-        [Description("Timeout in seconds")] int timeoutSec = 120)
+        [Description("Timeout in seconds")] int timeoutSec = 180)
     {
-        var psi = new ProcessStartInfo("bash", $"-lc \"{command.Replace("\"", "\\\"")}\"")
+        var psi = new ProcessStartInfo
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             WorkingDirectory = _cwd,
         };
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            psi.FileName = "cmd.exe";
+            psi.ArgumentList.Add("/c");
+            psi.ArgumentList.Add(command);
+        }
+        else
+        {
+            psi.FileName = "/bin/bash";
+            psi.ArgumentList.Add("-lc");
+            psi.ArgumentList.Add(command);
+        }
 
         using var proc = Process.Start(psi)!;
         var stdoutTask = proc.StandardOutput.ReadToEndAsync();

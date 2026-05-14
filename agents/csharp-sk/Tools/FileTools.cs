@@ -10,14 +10,10 @@ public sealed class FileTools
     public FileTools(string root) => _root = Path.GetFullPath(root);
 
     private string Resolve(string path)
-    {
-        var full = Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(_root, path));
-        return full;
-    }
+        => Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(_root, path));
 
     [KernelFunction, Description("List files in a directory inside the sandbox.")]
-    public string ListDir(
-        [Description("Absolute or sandbox-relative directory path")] string path)
+    public string ListDir([Description("Absolute or sandbox-relative directory path")] string path)
     {
         var full = Resolve(path);
         if (!Directory.Exists(full)) return $"NOT_A_DIRECTORY: {full}";
@@ -37,7 +33,7 @@ public sealed class FileTools
         return content.Length <= maxChars ? content : content[..maxChars] + "\n...[truncated]";
     }
 
-    [KernelFunction, Description("Write UTF-8 text to a file (overwrites). Use this to author code or output files.")]
+    [KernelFunction, Description("Write UTF-8 text to a file (overwrites). Use to author code files (.csx, .cs) or the final output file.")]
     public async Task<string> WriteFile(
         [Description("File path inside the sandbox")] string path,
         [Description("Full file contents")] string content)
