@@ -1,40 +1,62 @@
-# csharp-sk — C# + Semantic Kernel reference agent
+# csharp-sk — primary C# + Semantic Kernel agent
 
-This is the **primary agent** for AML-Agent-Bench, used as the PhD's reference
-implementation. The agent core is Microsoft Semantic Kernel; tools are exposed
-as `KernelFunction`s and the LLM drives a tool-calling loop until it emits
-`DONE`.
+The PhD's reference agent. .NET 8 console app powered by Microsoft Semantic
+Kernel. Tools are exposed as `KernelFunction`s; the LLM drives an auto
+function-choice loop until it emits `DONE`.
 
-The agent is language-agnostic at the *task* boundary — it only sees
-`instruction.md` and a sandbox filesystem. That means the same task suite can
-benchmark agents written in Python, TypeScript, Go, etc. (see `../README.md`).
+## Commands
 
-## Tools exposed to the model
+```text
+aml-agent run                    Run the benchmark loop (reads $BENCH_TASK_DIR/instruction.md)
+aml-agent chat [--task <id>]     Interactive CMD chat REPL for local testing
+aml-agent help                   Usage
+```
 
-| Plugin    | Function   | Purpose                                                  |
-|-----------|------------|----------------------------------------------------------|
-| `files`   | `ListDir`  | List a directory                                         |
-| `files`   | `ReadFile` | Read a UTF-8 text file                                   |
-| `files`   | `WriteFile`| Author code or output files                              |
-| `shell`   | `Run`      | Execute `bash -lc <cmd>` (python, pytest, ls, cat, ...)  |
+The same binary serves both inside-Docker benchmarking and outside-Docker
+local testing.
+
+## Tools
+
+| Plugin    | Function    | Purpose                                                |
+|-----------|-------------|--------------------------------------------------------|
+| `files`   | `ListDir`   | List a directory                                       |
+| `files`   | `ReadFile`  | Read a UTF-8 text file                                 |
+| `files`   | `WriteFile` | Author code (`.csx`, `.cs`) or the task's output file  |
+| `shell`   | `Run`       | Execute a shell command (cmd on Windows, bash on Linux)|
 
 ## Environment variables
 
-| Variable          | Default          | Meaning                                |
-|-------------------|------------------|----------------------------------------|
-| `OPENAI_API_KEY`  | (required)       | LLM credential                         |
-| `BENCH_MODEL`     | `gpt-4o-mini`    | Chat completion model id               |
-| `BENCH_TASK_DIR`  | `/app`           | Sandbox root (mounted by the harness)  |
-| `BENCH_MAX_STEPS` | `25`             | Hard cap on agent turns                |
+| Variable          | Default          | Meaning                                       |
+|-------------------|------------------|-----------------------------------------------|
+| `OPENAI_API_KEY`  | (required)       | LLM credential                                |
+| `BENCH_MODEL`     | `gpt-4o-mini`    | Chat completion model id                      |
+| `BENCH_TASK_DIR`  | `/app` (run) / `.` (chat) | Sandbox root                       |
+| `BENCH_MAX_STEPS` | `25`             | Hard cap on agent turns (run mode)            |
 
-## Build (local, outside Docker)
+## Local CMD chat (no Docker required)
 
-```bash
-dotnet build agents/csharp-sk/AmlAgent.csproj
+```cmd
+set OPENAI_API_KEY=sk-...
+dotnet run --project agents\csharp-sk\AmlAgent.csproj -- chat
 ```
 
-## Run via the benchmark harness
+Or pre-load a task's instructions:
 
-```bash
-python harness/run_agent.py --agent csharp-sk --task aml-transaction-network
+```cmd
+dotnet run --project agents\csharp-sk\AmlAgent.csproj -- chat --task aml-transaction-network
+```
+
+Inside the chat:
+
+```text
+/exit   /quit   leave
+/reset           clear history
+/help            show commands
+```
+
+## Benchmark via the C# harness
+
+```cmd
+set OPENAI_API_KEY=sk-...
+dotnet run --project src\AmlAgent.Harness -- --agent csharp-sk --task aml-transaction-network
 ```

@@ -15,11 +15,16 @@ Existing agent benchmarks mostly test general coding, tool use, or broad reasoni
 
 This repository provides a focused benchmark artifact for evaluating AI agents on AML transaction-network tasks.
 
-The **reference agent** is implemented in **C# with Microsoft Semantic Kernel**
-(`agents/csharp-sk/`) and is the primary subject of the PhD investigation. The
-harness (`harness/run_agent.py`) is intentionally language-agnostic: any agent
-that can be packaged as a Docker image and read `instruction.md` from `/app`
-can be benchmarked against the same tasks, enabling cross-language comparison.
+The **reference agent**, **harness**, **reference oracle**, and **tests** are all
+implemented in **C# (.NET 8)**. The primary agent (`agents/csharp-sk/`) uses
+Microsoft Semantic Kernel as the agent core and is the subject of the PhD
+investigation. Python is retained only for the one-off synthetic data
+generator (`scripts/generate_synthetic_aml_data.py`) — the runtime path is
+C# end-to-end.
+
+The harness is intentionally agent-agnostic: any agent packaged as a Docker
+image that reads `instruction.md` from `/app` can be benchmarked against the
+same tasks, enabling cross-language comparison.
 
 ## Thesis positioning
 
@@ -37,76 +42,102 @@ A possible PhD framing:
 
 ```text
 AML-Agent-Bench/
-├── README.md
+├── AML-Agent-Bench.sln           # Visual Studio 2022 solution
 ├── agents/
 │   ├── README.md
 │   └── csharp-sk/                # primary PhD agent (C# + Semantic Kernel)
-│       ├── Dockerfile
 │       ├── AmlAgent.csproj
-│       ├── Program.cs
-│       └── Tools/
-│           ├── FileTools.cs
-│           └── ShellTool.cs
-├── harness/
-│   ├── README.md
-│   └── run_agent.py              # Docker-sandboxed runner (any language)
-├── docs/
-│   └── research-problem.md
-├── scripts/
-│   └── generate_synthetic_aml_data.py
-└── tasks/
-    └── aml-transaction-network/
-        ├── instruction.md
-        ├── task.toml
-        ├── environment/
-        │   ├── Dockerfile
-        │   └── data/
-        │       └── transfers.csv
-        ├── solution/             # reference oracle (not the agent)
-        │   ├── solve.sh
-        │   └── solve.py
-        └── tests/
-            ├── test.sh
-            └── test_outputs.py
+│       ├── Program.cs            # subcommands: run | chat
+│       ├── Agent/
+│       │   ├── KernelFactory.cs
+│       │   ├── BenchmarkAgent.cs # `run` mode — one-shot benchmark
+│       │   └── ChatAgent.cs      # `chat` mode — interactive CMD REPL
+│       ├── Tools/
+│       │   ├── FileTools.cs
+│       │   └── ShellTool.cs
+│       ├── Dockerfile            # .NET SDK + dotnet-script sandbox
+│       └── README.md
+├── src/
+│   ├── AmlAgent.Oracle/          # reference oracle (C# port of solve.py)
+│   │   ├── AmlAgent.Oracle.csproj
+│   │   ├── AmlGraph.cs           # WCC + Tarjan SCC
+│   │   ├── OracleRunner.cs       # canonical clustering pipeline
+│   │   └── Program.cs
+│   └── AmlAgent.Harness/         # Docker orchestrator (replaces run_agent.py)
+│       ├── AmlAgent.Harness.csproj
+│       └── Program.cs
+├── tests/
+│   └── AmlAgent.Tests/           # xUnit — replaces test_outputs.py
+│       ├── AmlAgent.Tests.csproj
+│       ├── OracleSmokeTests.cs   # in-process oracle tests
+│       └── OutputContractTests.cs# schema / range / sort on workspace
+├── tasks/
+│   └── aml-transaction-network/
+│       ├── instruction.md
+│       ├── task.toml
+│       └── environment/data/transfers.csv
+├── docs/research-problem.md
+└── scripts/
+    └── generate_synthetic_aml_data.py   # one-off data gen (Python by design)
 ```
 
-## Running the C# / Semantic Kernel agent
+## Open in Visual Studio 2022
 
-```bash
-export OPENAI_API_KEY=sk-...
-python harness/run_agent.py --agent csharp-sk --task aml-transaction-network
+Open `AML-Agent-Bench.sln`. Four projects load:
+`AmlAgent` (the agent), `AmlAgent.Oracle`, `AmlAgent.Harness`, `AmlAgent.Tests`.
+
+## Local CMD chat (no Docker required)
+
+A quick way to interact with the C# agent before benchmarking:
+
+```cmd
+set OPENAI_API_KEY=sk-...
+dotnet run --project agents\csharp-sk\AmlAgent.csproj -- chat
+```
+
+Pre-load a task into the chat context:
+
+```cmd
+dotnet run --project agents\csharp-sk\AmlAgent.csproj -- chat --task aml-transaction-network
+```
+
+Inside the REPL: `/exit`, `/reset`, `/help`.
+
+## Run the full benchmark (Docker required)
+
+```cmd
+set OPENAI_API_KEY=sk-...
+dotnet run --project src\AmlAgent.Harness -- --agent csharp-sk --task aml-transaction-network
 ```
 
 The harness builds the agent image, runs it in a sandboxed container against
-the task's data, then runs the task tests in a fresh container against the
-agent's output. See `harness/README.md` and `agents/README.md` for details on
-plugging in agents written in other languages.
+the task's data, then runs the xUnit tests against the workspace.
 
-## Running the reference oracle locally
+## Run the reference oracle (no LLM)
 
-From the task directory:
+To verify the test contract end-to-end without spending tokens:
 
-```bash
-cd tasks/aml-transaction-network
-python solution/solve.py
-python -m pytest tests/test_outputs.py
+```cmd
+dotnet run --project src\AmlAgent.Harness -- --oracle
+```
+
+Or invoke the oracle directly:
+
+```cmd
+dotnet run --project src\AmlAgent.Oracle -- --input tasks\aml-transaction-network\environment\data\transfers.csv --output aml_clusters.csv
 ```
 
 ## Expected output
 
-The agent must produce:
-
-```text
-/app/aml_clusters.csv
-```
-
-with the exact schema:
+The agent must produce `aml_clusters.csv` at the sandbox root with exactly:
 
 ```text
 cluster_id,account_count,total_value,circular_flow_score,risk_score
 ```
 
+filtered to `risk_score >= 0.65`, sorted descending by `risk_score`, rounded
+to 4 decimal places.
+
 ## Notes
 
 The dataset is synthetic and is intended for research/evaluation only. It does not contain real customer or payment data.
-
