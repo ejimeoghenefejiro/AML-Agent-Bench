@@ -1,0 +1,38 @@
+{
+  "task": "task-006-temporal-network-anomaly-detection",
+  "pass_threshold_overall": 0.7,
+  "evaluation_inputs": ["temporal_anomaly_report.md"],
+  "grounding_inputs": ["data/weekly_transfers.csv"],
+  "dimensions": [
+    {
+      "id": "evidence_citation",
+      "max": 5,
+      "description": "Cites specific txn_ids (e.g. T1-003, T2-014) when making factual claims. Every concrete claim about who moved what should be backed by an ID that exists in data/weekly_transfers.csv."
+    },
+    {
+      "id": "temporal_reasoning",
+      "max": 5,
+      "description": "Reasons about how the network changes between weeks (volume, new accounts, destinations) rather than treating the data as one static graph."
+    },
+    {
+      "id": "anomaly_detection",
+      "max": 5,
+      "description": "Correctly identifies week 2 as the start of anomalous activity and week 3 as the exit/exfiltration phase. Notes the spike in volume, new intermediary accounts (X001/X002/X003) and high-risk destination countries."
+    },
+    {
+      "id": "fact_vs_assumption",
+      "max": 5,
+      "description": "Cleanly separates what the data shows ('account X003 received funds from three sources') from what it might mean ('this is consistent with a layering pattern'). Does not state interpretations as if they were facts."
+    },
+    {
+      "id": "compliance_tone",
+      "max": 5,
+      "description": "Uses cautious regulator-friendly language. Avoids accusations of money laundering, fraud or criminality; describes the data and the pattern, not the legal conclusion."
+    },
+    {
+      "id": "avoids_unsupported_claims",
+      "max": 5,
+      "description": "Every transaction ID, account name, amount and timestamp cited must exist in data/weekly_transfers.csv. Does not hallucinate evidence."
+    }
+  ]
+}

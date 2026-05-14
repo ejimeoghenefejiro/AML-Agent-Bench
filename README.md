@@ -32,11 +32,50 @@ A possible PhD framing:
 
 > Existing agent benchmarks test coding or general reasoning, but they do not sufficiently evaluate whether AI agents can perform regulated FinTech reasoning tasks such as AML network analysis, transaction clustering, suspicious flow detection, and evidence-based risk scoring.
 
-## Current task
+## Tasks
 
-| Task | Area | Difficulty |
-|---|---|---|
-| `aml-transaction-network` | AML graph analysis and suspicious cluster scoring | Hard |
+| Task | Area | Difficulty | Evaluators |
+|---|---|---|---|
+| `aml-transaction-network` | Static AML graph analysis and suspicious-cluster risk scoring | Hard | xUnit |
+| `task-006-temporal-network-anomaly-detection` | Week-over-week anomaly detection, evidence citation, compliance-style writing | Hard | xUnit + LLM-as-judge rubric |
+
+## How agents are benchmarked
+
+The harness builds (or pulls) an agent image, stages a temp workspace from
+`tasks/<task>/environment/` + the task brief, runs the agent against `/app`,
+then runs **two complementary evaluators** against the workspace:
+
+1. **`AmlAgent.Tests`** (xUnit) — deterministic structural checks: schema, value
+   ranges, sort order, decimal rounding, transaction-ID citation count.
+2. **`aml-agent judge`** (Semantic Kernel) — LLM-as-judge against the task's
+   `rubric.json`, scoring qualitative dimensions like evidence citation,
+   temporal reasoning, fact-vs-assumption separation, compliance tone, and
+   absence of unsupported claims. Writes `judge_report.json` in the workspace;
+   verdict is `PASS` when overall ≥ `pass_threshold_overall`.
+
+This twin-evaluator design is what positions the bench for FinCrime/RegTech:
+structural correctness is necessary but not sufficient — agents must also
+write evidence-based, compliance-friendly output to PASS.
+
+## Plugging in any agent (the polyglot story)
+
+```cmd
+:: 1) The built-in C# / Semantic Kernel agent
+dotnet run --project src\AmlAgent.Harness -- --agent csharp-sk
+
+:: 2) A pre-built Docker image (any language, any registry)
+dotnet run --project src\AmlAgent.Harness -- --agent-image my-registry/some-agent:v1
+
+:: 3) A local folder with a Dockerfile (user-uploaded submission)
+dotnet run --project src\AmlAgent.Harness -- --submission submissions\my-python-agent
+
+:: Pick any task — the same harness scores all three the same way
+dotnet run --project src\AmlAgent.Harness -- ^
+    --submission submissions\my-python-agent ^
+    --task task-006-temporal-network-anomaly-detection
+```
+
+See [submissions/README.md](submissions/README.md) for the submission contract.
 
 ## Repository structure
 
@@ -47,11 +86,14 @@ AML-Agent-Bench/
 │   ├── README.md
 │   └── csharp-sk/                # primary PhD agent (C# + Semantic Kernel)
 │       ├── AmlAgent.csproj
-│       ├── Program.cs            # subcommands: run | chat
+│       ├── Program.cs            # subcommands: run | chat | judge
 │       ├── Agent/
 │       │   ├── KernelFactory.cs
 │       │   ├── BenchmarkAgent.cs # `run` mode — one-shot benchmark
-│       │   └── ChatAgent.cs      # `chat` mode — interactive CMD REPL
+│       │   ├── ChatAgent.cs      # `chat` mode — interactive CMD REPL
+│       │   └── JudgeAgent.cs     # `judge` mode — LLM-as-judge scoring
+│       ├── Config/
+│       │   └── DotEnv.cs         # local .env loader (gitignored secrets)
 │       ├── Tools/
 │       │   ├── FileTools.cs
 │       │   └── ShellTool.cs
@@ -72,10 +114,20 @@ AML-Agent-Bench/
 │       ├── OracleSmokeTests.cs   # in-process oracle tests
 │       └── OutputContractTests.cs# schema / range / sort on workspace
 ├── tasks/
-│   └── aml-transaction-network/
-│       ├── instruction.md
+│   ├── aml-transaction-network/
+│   │   ├── instruction.md
+│   │   ├── task.toml
+│   │   └── environment/data/transfers.csv
+│   └── task-006-temporal-network-anomaly-detection/
+│       ├── prompt.md                  # canonical brief
+│       ├── instruction.md             # alias pointer
+│       ├── expected-behaviour.md
+│       ├── tests.md
+│       ├── rubric.json                # LLM-judge scoring criteria
 │       ├── task.toml
-│       └── environment/data/transfers.csv
+│       └── environment/data/weekly_transfers.csv
+├── submissions/                       # drop external agents here (gitignored)
+│   └── README.md
 ├── docs/research-problem.md
 └── scripts/
     └── generate_synthetic_aml_data.py   # one-off data gen (Python by design)

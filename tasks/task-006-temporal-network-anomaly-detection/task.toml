@@ -1,0 +1,16 @@
+id = "task-006-temporal-network-anomaly-detection"
+name = "Temporal Network Anomaly Detection"
+difficulty = "hard"
+tags = ["fintech", "aml", "temporal-graph", "anomaly-detection", "regtech", "compliance", "llm-as-judge"]
+
+description = "Evaluate whether an AI agent can detect how a transaction network changes over time (week 1 baseline -> week 2 new intermediaries -> week 3 high-risk exit), cite evidence by transaction ID, and write a compliance-friendly report."
+
+expected_outputs = [
+  "temporal_anomaly_summary.csv",
+  "temporal_anomaly_report.md",
+]
+
+# Evaluators applied after the agent exits.
+[evaluators]
+xunit = "tests/AmlAgent.Tests/AmlAgent.Tests.csproj"
+judge_rubric = "rubric.json"
