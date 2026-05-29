@@ -25,6 +25,10 @@ public static class Program
 {
     public static int Main(string[] args)
     {
+        var envFile = DotEnv.Load();
+        if (envFile is not null)
+            Console.WriteLine($"[env] loaded {envFile}");
+
         string agent = "csharp-sk";
         string task = "aml-transaction-network";
         string? model = null;
@@ -95,13 +99,9 @@ public static class Program
                 Console.WriteLine($"[harness] agent exit code: {agentRc}");
             }
 
-            // 1) xUnit structural tests
-            var testsProj = Path.Combine(repoRoot, "tests", "AmlAgent.Tests", "AmlAgent.Tests.csproj");
-            Console.WriteLine($"\n[harness] running xUnit tests against workspace");
-            var testRc = RunDotnetTest(testsProj, workspace);
-            Console.WriteLine($"[harness] xUnit exit code: {testRc}");
-
-            // 2) Judge rubric (if present)
+            // 1) Judge rubric first (if present) so the resulting
+            //    judge_report.json is on disk before xUnit runs — otherwise
+            //    JudgeReportTests skip themselves and we lose 4 assertions.
             int judgeRc = 0;
             var rubricPath = Path.Combine(taskDir, "rubric.json");
             if (!skipJudge && File.Exists(rubricPath))
@@ -112,12 +112,19 @@ public static class Program
             }
             else if (skipJudge)
             {
-                Console.WriteLine("[harness] --no-judge: skipping LLM judge");
+                Console.WriteLine("\n[harness] --no-judge: skipping LLM judge");
             }
             else
             {
-                Console.WriteLine("[harness] no rubric.json for this task — judge stage skipped");
+                Console.WriteLine("\n[harness] no rubric.json for this task — judge stage skipped");
             }
+
+            // 2) xUnit structural tests — runs LAST so it can assert on both the
+            //    agent's outputs and the judge_report.json produced above.
+            var testsProj = Path.Combine(repoRoot, "tests", "AmlAgent.Tests", "AmlAgent.Tests.csproj");
+            Console.WriteLine($"\n[harness] running xUnit tests against workspace");
+            var testRc = RunDotnetTest(testsProj, workspace);
+            Console.WriteLine($"[harness] xUnit exit code: {testRc}");
 
             var overall = (testRc == 0 && judgeRc == 0) ? 0 : 1;
             Console.WriteLine($"\n[harness] OVERALL: {(overall == 0 ? "PASS" : "FAIL")} (xunit={testRc} judge={judgeRc})");

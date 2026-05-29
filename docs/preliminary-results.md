@@ -84,6 +84,34 @@ Observations:
 3. **Operational friction is real and measurable.** OpenAI Tier-1 TPM (30 000 for gpt-4o, 200 000 for gpt-4o-mini) is the binding constraint on iteration speed for the stronger model. The harness already produces clean 429 traces — a useful side-result for any RegTech buyer considering production deployment.
 4. **The LLM-judge does not catch numeric errors that xUnit catches.** gpt-4o-mini's CSV had two undercount errors (SAR and high-risk-destination counts) that xUnit doesn't currently assert, and the LLM judge — looking at the markdown report — scored evidence-citation 5 / 5. This validates the **dual-evaluator design**: structural correctness and qualitative compliance writing are genuinely different signals.
 
+## Cross-language comparison (Docker harness, same prompt, same data)
+
+Run via the full polyglot harness path with Docker containers, on
+2026-05-29:
+
+| Submission | Language | Orchestration | xUnit | LLM-judge | Outcome |
+|---|---|---|---|---|---|
+| `agents/csharp-sk` | C# | Microsoft Semantic Kernel auto-function-calling | 11 passed (10 task-001 / no-rubric skipped) | **28 / 30 = 93.3 % PASS** | ✅ **PASS** |
+| `submissions/python-baseline` | Python | Hand-rolled ReAct loop with OpenAI Python SDK | **1 FAILED** (`AnomalyScoreStrictlyIncreasing` — week_3 score = 0.5, threshold ≥ 0.7) + 14 passed | 24 / 30 = 80.0 % PASS | ❌ **FAIL** |
+
+Both agents received identical instructions, identical synthetic data, and
+the same `gpt-4o-mini` backing model. They differed only in (a) language and
+(b) orchestration framework. The bench produced **discriminating** results on
+both evaluator axes:
+
+- Structural: the Python baseline assigned `anomaly_score = 0.5` to week 3,
+  which violates the `≥ 0.7` rule in the prompt. The C# / Semantic Kernel
+  agent assigned `0.95` and passed the same rule.
+- Qualitative: judge scores differ by 4 points (28 vs 24), driven by
+  weaker fact-vs-assumption separation and weaker evidence citation in the
+  Python baseline.
+
+This is the first cross-language data point demonstrating that AML-Agent-Bench
+fulfils its methodological claim: a Docker-packaged agent in any language can
+be benchmarked against the same tasks as the C# / Semantic Kernel reference
+agent, and the framework yields differential signals along both deterministic
+and qualitative dimensions.
+
 ## Next empirical steps
 
 These results are first-data, not a controlled study. The PhD's first-year empirical objective is to extend this into:

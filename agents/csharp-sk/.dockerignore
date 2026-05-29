@@ -1,0 +1,16 @@
+# Host-side build outputs that must NOT leak into the Docker context.
+# obj/project.assets.json hardcodes Windows-specific NuGet fallback paths
+# (e.g. "C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages")
+# that do not exist inside the Linux container and break `dotnet restore` /
+# `dotnet publish`. Always rebuild from scratch inside the image.
+bin/
+obj/
+**/bin/
+**/obj/
+
+# IDE noise
+.vs/
+*.user
+
+# Local secrets — never ship into an image
+.env
