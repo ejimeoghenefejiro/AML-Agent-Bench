@@ -38,6 +38,7 @@ public static class Program
         bool keepWorkspace = false;
         bool useOracle = false;
         bool skipJudge = false;
+        bool useLocal = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -52,6 +53,7 @@ public static class Program
                 case "--keep-workspace": keepWorkspace = true; break;
                 case "--oracle":         useOracle = true; break;
                 case "--no-judge":       skipJudge = true; break;
+                case "--local":          useLocal = true; break;
                 case "-h" or "--help":   PrintUsage(); return 0;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {args[i]}");
@@ -88,6 +90,19 @@ public static class Program
                 var res = OracleRunner.Run(input, output);
                 Console.WriteLine($"[harness] oracle wrote {res.ClustersWritten} clusters");
                 agentRc = 0;
+            }
+            else if (useLocal)
+            {
+                _ = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+                    ?? throw new InvalidOperationException("OPENAI_API_KEY not set");
+                if (!string.IsNullOrEmpty(agentImage) || !string.IsNullOrEmpty(submission))
+                {
+                    Console.Error.WriteLine("[harness] --local is only valid for --agent <name> (in-repo agents); --agent-image and --submission require Docker.");
+                    return 1;
+                }
+                Console.WriteLine($"[harness] --local: running agent directly via dotnet run (no Docker)");
+                agentRc = RunAgentLocal(repoRoot, agent, workspace, model, maxSteps);
+                Console.WriteLine($"[harness] agent exit code: {agentRc}");
             }
             else
             {
@@ -156,6 +171,8 @@ public static class Program
         Console.WriteLine("  --keep-workspace         keep the temp workspace dir after exit");
         Console.WriteLine("  --oracle                 use AmlAgent.Oracle instead of running an agent container");
         Console.WriteLine("                           (only valid for task=aml-transaction-network)");
+        Console.WriteLine("  --local                  run the in-repo agent directly via `dotnet run` instead of Docker");
+        Console.WriteLine("                           (only valid with --agent <name>; cannot combine with --agent-image / --submission)");
         Console.WriteLine("  --no-judge               skip the LLM-as-judge rubric stage");
     }
 
@@ -235,6 +252,29 @@ public static class Program
         }
         dockerArgs.Add(image);
         return RunProcess("docker", dockerArgs);
+    }
+
+    private static int RunAgentLocal(string repoRoot, string agent, string workspace, string? model, int maxSteps)
+    {
+        // Currently --local is only wired for csharp-sk because it's the
+        // only in-repo agent that ships as a .csproj. Other agents could be
+        // added with a name → invocation map.
+        if (agent != "csharp-sk")
+        {
+            Console.Error.WriteLine($"[harness] --local is only supported for --agent csharp-sk (got {agent})");
+            return 1;
+        }
+        var agentProj = Path.Combine(repoRoot, "agents", "csharp-sk", "AmlAgent.csproj");
+        var env = new Dictionary<string, string>
+        {
+            ["BENCH_TASK_DIR"] = workspace,
+            ["BENCH_MAX_STEPS"] = maxSteps.ToString(),
+        };
+        if (!string.IsNullOrEmpty(model)) env["BENCH_MODEL"] = model;
+        return RunProcess("dotnet", new[]
+        {
+            "run", "--project", agentProj, "--no-build", "--", "run"
+        }, env);
     }
 
     private static int RunDotnetTest(string testsProj, string workspace)

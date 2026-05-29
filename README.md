@@ -27,7 +27,7 @@
 
 > Canonical standalone copy of the abstract (with BibTeX): [docs/abstract.md](docs/abstract.md).
 >
-> First cross-model results: [docs/preliminary-results.md](docs/preliminary-results.md). Demo script for supervisor meetings: [docs/demo-script.md](docs/demo-script.md).
+> First cross-model results: [docs/preliminary-results.md](docs/preliminary-results.md). Demo script for supervisor meetings: [docs/demo-script.md](docs/demo-script.md). One-button reproducer for both with-Docker and without-Docker runs: [docs/reproduce.md](docs/reproduce.md).
 
 ---
 
