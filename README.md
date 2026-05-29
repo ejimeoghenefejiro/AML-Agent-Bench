@@ -26,6 +26,8 @@
 **Keywords:** agentic AI · large language models · anti-money laundering · benchmark · LLM-as-judge · Semantic Kernel · RegTech · compliance · graph reasoning · temporal anomaly detection
 
 > Canonical standalone copy of the abstract (with BibTeX): [docs/abstract.md](docs/abstract.md).
+>
+> First cross-model results: [docs/preliminary-results.md](docs/preliminary-results.md). Demo script for supervisor meetings: [docs/demo-script.md](docs/demo-script.md).
 
 ---
 
