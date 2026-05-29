@@ -38,6 +38,12 @@ Thumbs.db
 aml_clusters.csv
 aml-bench-*/
 
+# Run-by-run result archives. The harness writes a consolidated bench_result
+# JSON here for every run; over time this directory accumulates many files.
+# Keep the README but ignore the JSONs themselves. Add specific runs with
+# `git add -f results/<file>.json` when they are worth citing.
+results/*.json
+
 # Third-party submissions — keep the directory and its README but ignore
 # everyone else's agent code by default. Our own reference baselines are
 # explicit exceptions so they ship with the bench.

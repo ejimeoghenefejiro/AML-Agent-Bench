@@ -68,7 +68,9 @@ public static class Program
         var taskDir = Path.Combine(repoRoot, "tasks", task);
         if (!Directory.Exists(taskDir)) { Console.Error.WriteLine($"task not found: {taskDir}"); return 1; }
 
-        var workspace = Path.Combine(Path.GetTempPath(), $"aml-bench-{task}-{Guid.NewGuid():N}");
+        var runId = Guid.NewGuid().ToString("N");
+        var startedUtc = DateTime.UtcNow;
+        var workspace = Path.Combine(Path.GetTempPath(), $"aml-bench-{task}-{runId}");
         Directory.CreateDirectory(workspace);
         try
         {
@@ -137,9 +139,35 @@ public static class Program
             // 2) xUnit structural tests — runs LAST so it can assert on both the
             //    agent's outputs and the judge_report.json produced above.
             var testsProj = Path.Combine(repoRoot, "tests", "AmlAgent.Tests", "AmlAgent.Tests.csproj");
+            var trxPath = Path.Combine(workspace, "xunit_results.trx");
             Console.WriteLine($"\n[harness] running xUnit tests against workspace");
-            var testRc = RunDotnetTest(testsProj, workspace);
+            var testRc = RunDotnetTest(testsProj, workspace, trxPath);
             Console.WriteLine($"[harness] xUnit exit code: {testRc}");
+
+            // 3) Build consolidated bench_result.json + archival copy
+            var meta = new ReportBuilder.RunMeta(
+                RunId: runId,
+                StartedUtc: startedUtc,
+                CompletedUtc: DateTime.UtcNow,
+                Task: task,
+                AgentSource: useOracle ? "oracle"
+                          : useLocal  ? "in-repo-local"
+                          : !string.IsNullOrEmpty(agentImage) ? "agent-image"
+                          : !string.IsNullOrEmpty(submission) ? "submission"
+                          : "in-repo-docker",
+                AgentName: useOracle ? "AmlAgent.Oracle"
+                          : !string.IsNullOrEmpty(submission) ? Path.GetFileName(Path.GetFullPath(submission))
+                          : !string.IsNullOrEmpty(agentImage) ? agentImage
+                          : agent,
+                Model: model,
+                MaxSteps: maxSteps,
+                Mode: useOracle ? "oracle" : (useLocal ? "local" : "docker"));
+            var outcomes = new ReportBuilder.HarnessOutcomes(
+                AgentExitCode: agentRc,
+                XUnitExitCode: testRc,
+                JudgeExitCode: judgeRc,
+                JudgeWasRun: !skipJudge && File.Exists(rubricPath));
+            ReportBuilder.Build(workspace, repoRoot, meta, outcomes, trxPath);
 
             var overall = (testRc == 0 && judgeRc == 0) ? 0 : 1;
             Console.WriteLine($"\n[harness] OVERALL: {(overall == 0 ? "PASS" : "FAIL")} (xunit={testRc} judge={judgeRc})");
@@ -277,10 +305,14 @@ public static class Program
         }, env);
     }
 
-    private static int RunDotnetTest(string testsProj, string workspace)
+    private static int RunDotnetTest(string testsProj, string workspace, string trxPath)
     {
         var env = new Dictionary<string, string> { ["AML_BENCH_WORKSPACE"] = workspace };
-        return RunProcess("dotnet", new[] { "test", testsProj, "--nologo", "-v", "minimal" }, env);
+        return RunProcess("dotnet", new[]
+        {
+            "test", testsProj, "--nologo", "-v", "minimal",
+            "--logger", $"trx;LogFileName={trxPath}",
+        }, env);
     }
 
     private static int RunJudge(string repoRoot, string task, string workspace)
