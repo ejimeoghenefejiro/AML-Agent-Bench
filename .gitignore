@@ -39,6 +39,9 @@ aml_clusters.csv
 aml-bench-*/
 
 # Third-party submissions — keep the directory and its README but ignore
-# everyone else's agent code by default.
+# everyone else's agent code by default. Our own reference baselines are
+# explicit exceptions so they ship with the bench.
 submissions/*
 !submissions/README.md
+!submissions/python-baseline/
+!submissions/python-baseline/**
