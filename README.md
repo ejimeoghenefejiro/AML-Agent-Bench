@@ -2,7 +2,7 @@
 
 > A domain-specific benchmark for evaluating whether agentic AI systems can perform regulated FinTech reasoning — AML network analysis, transaction clustering, suspicious-flow detection, temporal anomaly detection and evidence-based, compliance-friendly reporting.
 
-**Status:** active PhD research codebase. C# / .NET 8 end-to-end, Semantic Kernel as the agent core, polyglot Docker harness so non-C# agents can also be benchmarked.
+**Status:** active PhD research codebase. C# / .NET 8 end-to-end, Microsoft Semantic Kernel as the agent core, polyglot Docker harness so non-C# agents can also be benchmarked, dual deterministic + LLM-as-judge evaluation, first cross-model and cross-language preliminary results captured.
 
 ---
 
@@ -27,7 +27,7 @@
 
 > Canonical standalone copy of the abstract (with BibTeX): [docs/abstract.md](docs/abstract.md).
 >
-> First cross-model results: [docs/preliminary-results.md](docs/preliminary-results.md). Demo script for supervisor meetings: [docs/demo-script.md](docs/demo-script.md). One-button reproducer for both with-Docker and without-Docker runs: [docs/reproduce.md](docs/reproduce.md).
+> First cross-model and cross-language results: [docs/preliminary-results.md](docs/preliminary-results.md). Demo script for supervisor meetings: [docs/demo-script.md](docs/demo-script.md). One-button reproducer for both with-Docker and without-Docker runs: [docs/reproduce.md](docs/reproduce.md).
 
 ---
 
@@ -37,18 +37,19 @@
 1. [Research problem](#1-research-problem)
 2. [What's in the box](#2-whats-in-the-box)
 3. [Prerequisites](#3-prerequisites)
-4. [Quick start (5 minutes, no LLM cost)](#4-quick-start-5-minutes-no-llm-cost)
+4. [Quick start (one button, with or without Docker)](#4-quick-start-one-button-with-or-without-docker)
 5. [Running with a real LLM](#5-running-with-a-real-llm)
 6. [Benchmarking your own agent](#6-benchmarking-your-own-agent)
 7. [Tasks](#7-tasks)
 8. [The two evaluators (xUnit + SK judge)](#8-the-two-evaluators-xunit--sk-judge)
-9. [Repository structure](#9-repository-structure)
-10. [Architecture](#10-architecture)
-11. [CLI reference](#11-cli-reference)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Costs and safety notes](#13-costs-and-safety-notes)
-14. [Reproducing the data](#14-reproducing-the-data)
-15. [License & data disclaimer](#15-license--data-disclaimer)
+9. [Results: the bench_result.json contract](#9-results-the-bench_resultjson-contract)
+10. [Repository structure](#10-repository-structure)
+11. [Architecture](#11-architecture)
+12. [CLI reference](#12-cli-reference)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Costs and safety notes](#14-costs-and-safety-notes)
+15. [Reproducing the data](#15-reproducing-the-data)
+16. [License & data disclaimer](#16-license--data-disclaimer)
 
 ---
 
@@ -93,13 +94,14 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 |---|---|---|
 | **Reference agent** | `agents/csharp-sk/` — .NET 8 + Microsoft Semantic Kernel | The primary subject of the PhD investigation; tool-calling agent with `run`, `chat`, and `judge` subcommands |
 | **Reference oracle** | `src/AmlAgent.Oracle/` | Pure-C# canonical solution for Task 001; produces ground-truth output without spending LLM tokens |
-| **Harness** | `src/AmlAgent.Harness/` | Docker-based benchmark runner; works with any agent image |
+| **Harness** | `src/AmlAgent.Harness/` | Benchmark runner; supports `--local` (no Docker) and Docker modes; writes consolidated `bench_result.json` per run |
 | **LLM-as-judge** | `agents/csharp-sk/Agent/JudgeAgent.cs` | The same SK core grades qualitative regulatory properties against a `rubric.json` |
-| **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort / citation assertions |
+| **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort / citation assertions across two tasks and the judge report |
 | **Tasks** | `tasks/<task-id>/` | Self-contained task definitions: brief + data + expected behaviour + tests + rubric |
-| **Submissions** | `submissions/` (gitignored) | Drop point for other people's agent code/images for benchmarking |
+| **Submissions** | `submissions/` (mostly gitignored) | Drop point for external agents; ships with one reference Python baseline |
+| **Run results** | `results/` (gitignored JSONs, tracked README) | One `bench_result.json` per run, ready for cross-run aggregation |
 
-Everything in the runtime path is **C#**. Python is retained only for the one-off synthetic-data generator (`scripts/generate_synthetic_aml_data.py`) used to produce Task 001's dataset.
+Everything in the runtime path is **C#**. Python is retained only for the one-off synthetic-data generator (`scripts/generate_synthetic_aml_data.py`) used to produce Task 001's dataset, and for the reference Python baseline submission (`submissions/python-baseline/`).
 
 ---
 
@@ -111,8 +113,9 @@ To pull and run this repo you need:
 |---|---|---|
 | **Git** | any recent | Cloning the repo |
 | **.NET SDK** | **8.0.x** (newer also works) | Building + running everything |
-| **Docker Desktop** (or Docker Engine) | any recent | Running the benchmark harness end-to-end. **Optional** — you can build, test and run the oracle without Docker. |
-| **OpenAI API key** | a working key | The live agent, the chat REPL, and the SK-as-judge. **Optional** — you can verify the entire bench without it via `--oracle --no-judge`. |
+| **PowerShell** | 5.1 or 7+ | The one-button reproducer script on Windows (Bash equivalent ships for Linux/macOS/WSL) |
+| **Docker Desktop** (or Docker Engine) | any recent | **Optional** — Docker mode. Use `--local` to run the C# agent on the host instead. |
+| **OpenAI API key** | a working key | **Optional** — only needed for the live agent, the chat REPL, and the SK-as-judge. The Oracle path needs no key. |
 | **Visual Studio 2022** | 17.8+ | Optional — for IDE work. The `dotnet` CLI alone is enough. |
 
 Verify versions:
@@ -127,9 +130,36 @@ The codebase has been tested on Windows 11 with PowerShell and `cmd.exe`. The co
 
 ---
 
-## 4. Quick start (5 minutes, no LLM cost)
+## 4. Quick start (one button, with or without Docker)
 
-This sequence pulls the repo, builds everything, and runs the full reference pipeline **without** calling an LLM or starting Docker.
+### The fastest path — one PowerShell command
+
+After cloning the repo and creating your `.env` (see §5.1 below), run:
+
+```powershell
+:: Local mode — no Docker required, ~30s, ~$0.003 in API cost
+powershell -ExecutionPolicy Bypass -File scripts\test-bench.ps1 -Mode local
+
+:: Docker mode — full polyglot path, includes Python baseline, ~2min
+powershell -ExecutionPolicy Bypass -File scripts\test-bench.ps1 -Mode docker
+
+:: Both modes back-to-back
+powershell -ExecutionPolicy Bypass -File scripts\test-bench.ps1 -Mode both
+```
+
+Linux / macOS / WSL:
+
+```bash
+scripts/test-bench.sh --mode local
+scripts/test-bench.sh --mode docker
+scripts/test-bench.sh --mode both
+```
+
+The script runs build, the reference Oracle, the live C# / Semantic Kernel agent (always), and (Docker only) the Python baseline submission. Each step prints `PASS` or `FAIL` and ends with a coloured summary. See [docs/reproduce.md](docs/reproduce.md) for the full breakdown of what every PASS / FAIL outcome means.
+
+### Cost-free sanity check (no API key, no Docker)
+
+This sequence builds everything and runs the full reference pipeline without calling an LLM or starting Docker — perfect for confirming the bench installs cleanly:
 
 ```cmd
 :: 1. clone
@@ -139,7 +169,7 @@ cd AML-Agent-Bench
 :: 2. build all 4 projects
 dotnet build AML-Agent-Bench.sln
 
-:: 3. run xUnit (Oracle smoke tests only — workspace-dependent ones skip)
+:: 3. run xUnit (the in-process Oracle smoke tests run; workspace-dependent ones skip)
 dotnet test tests\AmlAgent.Tests\AmlAgent.Tests.csproj
 
 :: 4. run the C# reference oracle on Task 001's bundled data
@@ -148,17 +178,17 @@ dotnet run --project src\AmlAgent.Oracle -- ^
     --output aml_clusters.csv
 
 :: 5. run the harness in oracle mode — stages a workspace, runs the oracle,
-::    runs xUnit against the workspace, reports OVERALL PASS/FAIL
+::    runs xUnit against it, writes bench_result.json, reports OVERALL PASS/FAIL
 dotnet run --project src\AmlAgent.Harness -- --oracle --no-judge
 ```
 
 Expected after step 5:
 
 ```text
+[harness] wrote     <temp>\bench_result.json
+[harness] archived  results\<timestamp>-...-AmlAgent.Oracle.json
 [harness] OVERALL: PASS (xunit=0 judge=0)
 ```
-
-If that prints, the whole non-LLM half of the bench is working on your machine.
 
 To open everything in Visual Studio 2022:
 
@@ -172,14 +202,14 @@ start AML-Agent-Bench.sln
 
 ### 5.1 Configure your API key in a `.env`
 
-The C# agent loads a `.env` from the repo root on startup (`agents/csharp-sk/Config/DotEnv.cs`). Create it:
+Both the C# agent and the harness load a `.env` from the repo root on startup (via `agents/csharp-sk/Config/DotEnv.cs` and `src/AmlAgent.Harness/DotEnv.cs`). Create it:
 
 ```cmd
 copy .env.example .env
 notepad .env
 ```
 
-Set just the line:
+Set the line:
 
 ```text
 OPENAI_API_KEY=sk-your-key-here
@@ -207,7 +237,7 @@ You'll see:
 you>
 ```
 
-Type a question and press Enter. The agent has these tools wired in: `files.ListDir`, `files.ReadFile`, `files.WriteFile`, and `shell.Run`. To pre-load a task into the chat context:
+The agent has these tools wired in: `files.ListDir`, `files.ReadFile`, `files.WriteFile`, and `shell.Run`. To pre-load a task into the chat context:
 
 ```cmd
 dotnet run --project agents\csharp-sk\AmlAgent.csproj -- chat --task aml-transaction-network
@@ -216,7 +246,18 @@ dotnet run --project agents\csharp-sk\AmlAgent.csproj -- chat --task task-006-te
 
 Slash commands: `/exit`, `/reset`, `/help`.
 
-### 5.3 Full benchmark run (requires Docker)
+### 5.3 Full benchmark run — `--local` mode (no Docker)
+
+```cmd
+dotnet run --project src\AmlAgent.Harness -- ^
+    --agent csharp-sk ^
+    --task task-006-temporal-network-anomaly-detection ^
+    --local
+```
+
+The harness stages a workspace, runs the C# agent via `dotnet run` on the host, then runs the judge and xUnit and writes `bench_result.json`. No Docker required.
+
+### 5.4 Full benchmark run — Docker mode
 
 ```cmd
 dotnet run --project src\AmlAgent.Harness -- ^
@@ -229,13 +270,14 @@ What the harness does:
 1. Builds the agent's Docker image from `agents/csharp-sk/Dockerfile`.
 2. Stages a temp workspace from `tasks/<task>/environment/` + the task brief.
 3. Runs the agent container against `/app` with `OPENAI_API_KEY`, `BENCH_MODEL`, `BENCH_MAX_STEPS`.
-4. Runs `dotnet test` against the workspace via `AML_BENCH_WORKSPACE` (the xUnit evaluator).
-5. Runs `aml-agent judge` against the workspace if the task has `rubric.json` (the LLM-as-judge evaluator).
-6. Prints `OVERALL: PASS / FAIL (xunit=… judge=…)`.
+4. Runs `aml-agent judge` against the workspace (if the task has `rubric.json`).
+5. Runs `dotnet test` against the workspace via `AML_BENCH_WORKSPACE` (xUnit, with TRX logger).
+6. Writes `bench_result.json` to the workspace + an archival copy to `results/`.
+7. Prints `OVERALL: PASS / FAIL (xunit=… judge=…)`.
 
-### 5.4 Just the SK-as-judge on an existing workspace
+### 5.5 Just the SK-as-judge on an existing workspace
 
-If you have an agent's output files in a folder and just want to score them:
+If you already have an agent's output files in a folder and want to re-score them:
 
 ```cmd
 dotnet run --project agents\csharp-sk\AmlAgent.csproj -- ^
@@ -247,7 +289,7 @@ dotnet run --project agents\csharp-sk\AmlAgent.csproj -- ^
 This writes `judge_report.json` into that workspace and prints something like:
 
 ```text
-[judge] overall: 30/30 = 100.0%
+[judge] overall: 29/30 = 96.7%
 [judge] verdict: PASS (threshold 70%)
 ```
 
@@ -259,7 +301,7 @@ The harness accepts **three** agent sources. Pick the one that matches how your 
 
 ### 6.1 As a folder inside `agents/`
 
-Useful if you're co-developing the agent alongside the bench.
+Useful if you're co-developing the agent alongside the bench. With `--local` you can run it without Docker provided it's a C# `.csproj`; without `--local` it must ship a Dockerfile.
 
 ```text
 agents/
@@ -285,7 +327,7 @@ No build step happens — the harness `docker run`s the image directly.
 
 ### 6.3 As a local folder submission
 
-Drop a folder under `submissions/` containing a `Dockerfile` (and any code/data you want baked in). `submissions/*` is gitignored, so external code stays out of the repo.
+Drop a folder under `submissions/` containing a `Dockerfile` (and any code/data you want baked in). `submissions/*` is gitignored by default so external code stays out of the repo.
 
 ```cmd
 dotnet run --project src\AmlAgent.Harness -- ^
@@ -293,7 +335,17 @@ dotnet run --project src\AmlAgent.Harness -- ^
     --task task-006-temporal-network-anomaly-detection
 ```
 
-### 6.4 Minimum agent contract
+### 6.4 Reference Python baseline
+
+The repo ships a working Python agent at [submissions/python-baseline/](submissions/python-baseline/) — minimal ReAct loop using the OpenAI Python SDK with `list_dir` / `read_file` / `write_file` tools. Run it to verify the polyglot harness path works on your machine:
+
+```cmd
+dotnet run --project src\AmlAgent.Harness -- ^
+    --submission submissions\python-baseline ^
+    --task task-006-temporal-network-anomaly-detection
+```
+
+### 6.5 Minimum agent contract
 
 Whatever language you write your agent in, the image must:
 
@@ -306,9 +358,9 @@ Whatever language you write your agent in, the image must:
    - `BENCH_TASK_DIR`
 4. Exit `0` when it has produced its outputs.
 
-The harness ignores the exit code for grading — **scoring is purely on the workspace contents**. xUnit and the judge run after the container exits.
+The harness ignores the exit code for grading — **scoring is purely on the workspace contents**. The judge and xUnit run after the container exits.
 
-See [submissions/README.md](submissions/README.md) for a Python example.
+See [submissions/README.md](submissions/README.md) for the full submission contract.
 
 ---
 
@@ -339,15 +391,17 @@ See [submissions/README.md](submissions/README.md) for a Python example.
 
 More tasks can be added by creating a new `tasks/<id>/` folder with the same files.
 
+**See [docs/preliminary-results.md](docs/preliminary-results.md) for first real cross-model and cross-language results across both tasks.**
+
 ---
 
 ## 8. The two evaluators (xUnit + SK judge)
 
-After the agent exits, the harness runs **both** evaluators against the same workspace. Either failing produces `OVERALL: FAIL`.
+After the agent exits, the harness runs **both** evaluators against the same workspace. Either failing produces `OVERALL: FAIL`. The judge runs first so the resulting `judge_report.json` is on disk before xUnit asserts on it.
 
 ### 8.1 `AmlAgent.Tests` (xUnit — deterministic)
 
-Pure-C# tests in `tests/AmlAgent.Tests/`. Read `AML_BENCH_WORKSPACE` and validate the workspace's output files. Examples of what they check:
+Pure-C# tests in `tests/AmlAgent.Tests/`. Read `AML_BENCH_WORKSPACE` and validate the workspace's output files. They emit a TRX log that the harness parses into the consolidated `bench_result.json`. Examples of what they check:
 
 - Schema matches **exactly** the expected column order.
 - All `risk_score`s in `[0, 1]` and above the task threshold.
@@ -370,17 +424,14 @@ Example `judge_report.json` (real run, Task 006):
     "evidence_citation":         {"score": 5, "max": 5, "reasoning": "All claims are supported by specific transaction IDs from the dataset."},
     "temporal_reasoning":        {"score": 5, "max": 5, "reasoning": "The analysis effectively describes the changes in the network across the three weeks."},
     "anomaly_detection":         {"score": 5, "max": 5, "reasoning": "Correctly identifies week 2 as the start of anomalous activity and week 3 as the exit phase."},
-    "fact_vs_assumption":        {"score": 5, "max": 5, "reasoning": "Clearly distinguishes between observed data and interpretations."},
+    "fact_vs_assumption":        {"score": 4, "max": 5, "reasoning": "Mostly separates facts from assumptions, but could clarify further on implications of the data."},
     "compliance_tone":           {"score": 5, "max": 5, "reasoning": "Uses cautious language and avoids accusations of wrongdoing."},
     "avoids_unsupported_claims": {"score": 5, "max": 5, "reasoning": "No unsupported claims are made; all cited data exists in the provided dataset."}
   },
-  "overall_score": 30,
+  "overall_score": 29,
   "overall_max": 30,
-  "overall_percentage": 1,
-  "verdict": "PASS",
-  "pass_threshold_overall": 0.7,
-  "task": "task-006-temporal-network-anomaly-detection",
-  "model": "gpt-4o-mini"
+  "overall_percentage": 0.9667,
+  "verdict": "PASS"
 }
 ```
 
@@ -388,7 +439,45 @@ The overall percentage and verdict are **recomputed defensively in C#** from the
 
 ---
 
-## 9. Repository structure
+## 9. Results: the `bench_result.json` contract
+
+Every harness invocation writes a consolidated JSON record summarising the entire run. Two copies are written:
+
+1. **In the workspace** — `<temp>/aml-bench-.../bench_result.json` (deleted unless `--keep-workspace`).
+2. **In the repo's `results/` folder** — `results/<UTC-timestamp>-<task>-<agent>.json` (persists; gitignored so the folder doesn't bloat).
+
+One file per run = trivial cross-run aggregation. See [results/README.md](results/README.md) for the full schema and a ready-made PowerShell / jq aggregator that turns the folder into a results table.
+
+A trimmed example:
+
+```json
+{
+  "task": "task-006-temporal-network-anomaly-detection",
+  "agent": { "name": "csharp-sk", "model": "gpt-4o-mini", "mode": "local" },
+
+  "agent_outputs": {
+    "temporal_anomaly_summary.csv": {
+      "rows": [
+        { "week": "week_1", "anomaly_score": "0.0000", ... },
+        { "week": "week_2", "anomaly_score": "0.5000", ... },
+        { "week": "week_3", "anomaly_score": "1.0000", ... }
+      ]
+    }
+  },
+
+  "xunit":  { "verdict": "PASS", "total": 21, "passed": 15, "failed": 0, "skipped": 6, "failures": [] },
+  "judge":  { "overall_percentage": 0.9667, "verdict": "PASS", "scores": { ... six dimensions ... } },
+
+  "overall_verdict": "PASS",
+  "overall_reason":  "xUnit PASS (15/21); judge PASS at 96.7%"
+}
+```
+
+When the agent fails an assertion, the same file contains the **exact rule it broke** in `xunit.failures[*].message` — e.g. `"expected week_3 anomaly_score >= 0.7, got 0.375"`. That string is the empirical evidence that the bench discriminates between agents.
+
+---
+
+## 10. Repository structure
 
 ```text
 AML-Agent-Bench/
@@ -410,17 +499,20 @@ AML-Agent-Bench/
 │       │   ├── FileTools.cs      # ListDir / ReadFile / WriteFile
 │       │   └── ShellTool.cs      # cross-platform shell (cmd / bash)
 │       ├── Dockerfile            # sandbox: .NET SDK + dotnet-script
+│       ├── .dockerignore         # keeps host bin/obj/ out of the build context
 │       └── README.md
 ├── src/
-│   ├── AmlAgent.Oracle/          # reference oracle (no LLM, no Docker)
+│   ├── AmlAgent.Oracle/          # reference Oracle (no LLM, no Docker)
 │   │   ├── AmlGraph.cs           # union-find WCC + iterative Tarjan SCC
 │   │   ├── OracleRunner.cs       # canonical clustering pipeline
 │   │   └── Program.cs            # `aml-oracle --input ... --output ...`
-│   └── AmlAgent.Harness/         # Docker orchestrator (any-language agents)
-│       └── Program.cs            # `aml-harness --agent / --agent-image / --submission`
+│   └── AmlAgent.Harness/         # benchmark runner (local + Docker)
+│       ├── Program.cs            # `aml-harness --agent / --agent-image / --submission / --local`
+│       ├── ReportBuilder.cs      # writes consolidated bench_result.json + results/ archive
+│       └── DotEnv.cs             # mirror loader so the harness also picks up .env
 ├── tests/
 │   └── AmlAgent.Tests/           # xUnit
-│       ├── OracleSmokeTests.cs       # in-process oracle tests
+│       ├── OracleSmokeTests.cs       # in-process Oracle tests
 │       ├── OutputContractTests.cs    # Task 001 schema / range / sort tests
 │       ├── Task006SummaryTests.cs    # Task 006 CSV + markdown tests
 │       └── JudgeReportTests.cs       # judge_report.json shape + verdict
@@ -430,6 +522,7 @@ AML-Agent-Bench/
 │   │   ├── task.toml
 │   │   └── environment/data/transfers.csv
 │   └── task-006-temporal-network-anomaly-detection/
+│       ├── README.md                  # task overview
 │       ├── prompt.md                  # canonical brief
 │       ├── instruction.md             # alias pointer
 │       ├── expected-behaviour.md      # what a good response looks like
@@ -438,53 +531,72 @@ AML-Agent-Bench/
 │       ├── task.toml
 │       └── environment/data/weekly_transfers.csv
 ├── submissions/                       # drop external agents here (gitignored)
-│   └── README.md                      # submission contract + Python example
-├── docs/
-│   └── research-problem.md
+│   ├── README.md
+│   └── python-baseline/               # reference Python agent (committed)
+│       ├── Dockerfile
+│       ├── agent.py
+│       ├── README.md
+│       └── .dockerignore
+├── results/                           # per-run bench_result.json archive (gitignored)
+│   └── README.md                      # schema + aggregation one-liners
 ├── scripts/
+│   ├── test-bench.ps1                 # one-button reproducer (Windows)
+│   ├── test-bench.sh                  # one-button reproducer (Linux/macOS/WSL)
 │   └── generate_synthetic_aml_data.py # one-off Task 001 data generator
+├── docs/
+│   ├── abstract.md                    # canonical citable abstract + BibTeX
+│   ├── preliminary-results.md         # first cross-model and cross-language results
+│   ├── demo-script.md                 # rehearsed supervisor-meeting demo
+│   ├── reproduce.md                   # how to reproduce results locally
+│   └── research-problem.md            # extended research framing
 └── README.md                          # this file
 ```
 
 ---
 
-## 10. Architecture
+## 11. Architecture
 
 ```text
                 ┌────────────────────────────────────────────────────────┐
                 │             aml-harness (src/AmlAgent.Harness)         │
+                │   --local OR --agent-image / --submission / --agent    │
                 │                                                        │
-                │   stages workspace ──► runs agent container ──► runs   │
-                │   from tasks/<id>/    via Docker                two    │
-                │                                                evaluators
+                │   stages workspace ─► runs agent ─► runs two evaluators│
+                │   from tasks/<id>/    (host or                         │
+                │                       Docker)         ─► bench_result  │
+                │                                          (workspace +  │
+                │                                          results/)     │
                 └─────────────┬────────────────────┬─────────────────────┘
                               │                    │
             ┌─────────────────▼────┐   ┌──────────▼──────────────────────┐
-            │  Agent (Docker)      │   │  Evaluators (host)              │
-            │  any language        │   │                                  │
-            │                      │   │  1. AmlAgent.Tests (xUnit)       │
-            │  primary:            │   │     deterministic structure      │
-            │  C# + Semantic       │   │                                  │
-            │  Kernel              │   │  2. aml-agent judge              │
-            │                      │   │     SK chat against rubric.json  │
-            │  reads /app/         │   │     → writes judge_report.json   │
-            │  instruction.md      │   │                                  │
-            │  writes /app/<out>   │   │  → OVERALL: PASS / FAIL          │
-            └──────────────────────┘   └──────────────────────────────────┘
+            │  Agent                │   │  Evaluators (host)              │
+            │  any language         │   │                                  │
+            │                       │   │  1. aml-agent judge              │
+            │  primary:             │   │     SK chat against rubric.json  │
+            │  C# + Semantic        │   │     → writes judge_report.json   │
+            │  Kernel               │   │                                  │
+            │                       │   │  2. AmlAgent.Tests (xUnit)       │
+            │  reads /app/          │   │     deterministic structure      │
+            │  instruction.md       │   │     → TRX log                    │
+            │  writes /app/<out>    │   │                                  │
+            │                       │   │  → OVERALL: PASS / FAIL          │
+            └───────────────────────┘   └──────────────────────────────────┘
 ```
 
 **Key design choices**
 
 - **Agent core is Semantic Kernel.** Tools are exposed as `KernelFunction`s; the LLM drives an auto function-calling loop until it emits `DONE`. The agent never has direct access to the test code or the rubric.
-- **Two evaluators in parallel.** xUnit catches structural failures the judge would over-rate; the judge catches qualitative compliance failures the xUnit tests can't express in code.
+- **Two evaluators with the right ordering.** Judge runs first so its JSON is on disk; xUnit then asserts on both the agent's outputs **and** the judge report. Either failing produces `OVERALL: FAIL`.
 - **C# does the arithmetic.** The judge LLM produces per-dimension scores; the harness recomputes the overall percentage and verdict in C#, so the LLM cannot inflate its own pass rate.
 - **The judge is grounded.** The judge prompt includes the task's underlying data so the LLM can verify cited transaction IDs really exist.
 - **Workspace isolation.** Each run creates a fresh temp workspace; no two runs share state.
-- **Polyglot harness.** The harness only requires a Docker image that reads `instruction.md` and writes output files — the agent language doesn't matter.
+- **Local mode parity.** `--local` runs the C# agent on the host via `dotnet run` and runs the same evaluators against the same workspace shape — useful when Docker isn't available.
+- **Polyglot harness.** The harness only requires a Docker image that reads `instruction.md` and writes output files — the agent language doesn't matter. The bundled Python baseline proves this on every Docker-mode run.
+- **Persistent results.** Every run produces a `bench_result.json` and an archival copy under `results/` for cross-run aggregation.
 
 ---
 
-## 11. CLI reference
+## 12. CLI reference
 
 ### `aml-agent` (the C# / SK agent)
 
@@ -509,7 +621,7 @@ Environment:
 | `BENCH_TASK_DIR` | `/app` (`run`) / cwd (`chat`) | Sandbox root |
 | `BENCH_MAX_STEPS` | `25` | Cap on agent turns in `run` mode |
 
-### `aml-harness` (the Docker orchestrator)
+### `aml-harness` (the benchmark runner)
 
 ```cmd
 dotnet run --project src\AmlAgent.Harness -- [agent-source] [--task <id>] [options]
@@ -520,10 +632,11 @@ dotnet run --project src\AmlAgent.Harness -- [agent-source] [--task <id>] [optio
 | `--agent <name>` | Subfolder of `agents/` (default `csharp-sk`). The harness builds its `Dockerfile`. |
 | `--agent-image <tag>` | Use a **pre-built** Docker image as the agent (no build step). |
 | `--submission <path>` | Build the `Dockerfile` in a local folder (typically `submissions/<name>`). |
+| `--local` | Run the in-repo C# agent directly via `dotnet run` (no Docker). Cannot combine with `--agent-image` / `--submission`. |
 | `--task <id>` | Task folder under `tasks/`. Default: `aml-transaction-network`. |
-| `--model <id>` | Override `BENCH_MODEL` passed into the agent container. |
+| `--model <id>` | Override `BENCH_MODEL`. |
 | `--max-steps <n>` | Override `BENCH_MAX_STEPS`. |
-| `--oracle` | Skip the agent container; produce output via `AmlAgent.Oracle` instead. Only valid for `aml-transaction-network`. |
+| `--oracle` | Skip the agent; produce output via `AmlAgent.Oracle`. Only valid for `aml-transaction-network`. |
 | `--no-judge` | Skip the LLM-as-judge stage even if `rubric.json` exists. |
 | `--keep-workspace` | Don't delete the temp workspace on exit (useful for inspection). |
 
@@ -533,37 +646,53 @@ dotnet run --project src\AmlAgent.Harness -- [agent-source] [--task <id>] [optio
 dotnet run --project src\AmlAgent.Oracle -- --input <transfers.csv> --output <aml_clusters.csv>
 ```
 
+### `scripts/test-bench.ps1` and `scripts/test-bench.sh` (one-button reproducer)
+
+```powershell
+scripts\test-bench.ps1 -Mode local | docker | both [-Model <id>] [-MaxSteps <n>] [-SkipPython]
+scripts/test-bench.sh   --mode local|docker|both [--model <id>] [--max-steps <n>] [--skip-python]
+```
+
+See [docs/reproduce.md](docs/reproduce.md) for the full reference.
+
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 **`dotnet --version` says something else** — install the .NET 8 SDK from <https://dotnet.microsoft.com/download/dotnet/8.0>. Newer SDKs (9.x) also work.
 
-**`OPENAI_API_KEY is not set`** — copy `.env.example` to `.env` and put your key in. Make sure you're running commands from the repo root so the `.env` walk-up finder picks it up.
+**`OPENAI_API_KEY is not set`** — copy `.env.example` to `.env` and put your key in. Make sure you're running commands from the repo root so the `.env` walk-up finder picks it up. Both the agent and the harness load `.env` independently.
 
-**`docker: command not found`** — install Docker Desktop. Or use `--oracle --no-judge` to verify the bench end-to-end without Docker or an LLM.
+**`docker: command not found` or daemon not running** — install / start Docker Desktop, OR add `--local` to the harness command, OR use `--oracle --no-judge` to verify the bench end-to-end without Docker or an LLM.
 
 **Tests are mostly `[SKIP]`** — that's expected when you run `dotnet test` without a workspace. Workspace-dependent tests skip via `SkippableFact`. Run them through `aml-harness` (which sets `AML_BENCH_WORKSPACE`) to exercise them.
 
-**Agent says `DONE` immediately without doing anything** — the system prompt biases toward `DONE` as a completion signal. In `chat` mode, give it a concrete instruction that asks for tool calls (e.g. "Use files.ListDir to show me what's in this folder, then summarise"). In `run` mode the instruction.md gives it real work to do, so this is rarely an issue.
+**`HTTP 429 (tokens: rate_limit_exceeded)`** — OpenAI per-organization TPM limits. Wait 60 s and re-run, drop `--max-steps`, or use a smaller model.
 
-**Judge returns invalid JSON** — `JudgeAgent.cs` prints the raw response and exits non-zero. Re-run; if it persists, the model is the cause — try `BENCH_JUDGE_MODEL=gpt-4o`.
+**Agent says `DONE` immediately without doing anything** — the system prompt biases toward `DONE` as a completion signal. In `chat` mode, give it a concrete instruction that asks for tool calls. In `run` mode the instruction.md gives it real work to do, so this is rarely an issue.
 
-**Want to see what the agent produced before tests/judge run** — pass `--keep-workspace` to the harness; it prints the workspace path and leaves it on disk.
+**Judge returns invalid JSON** — `JudgeAgent.cs` prints the raw response and exits non-zero. Re-run; if it persists, set `BENCH_JUDGE_MODEL=gpt-4o`.
+
+**Agent FAILs `AnomalyScoreStrictlyIncreasing` (Task 006)** — the LLM frequently writes `week_3 anomaly_score < 0.7` for Task 006. This is **the bench discriminating against a real failure mode**, not a bug. Re-run; the same agent passes some of the time. See [docs/reproduce.md](docs/reproduce.md) for the full "what every FAIL means" table.
+
+**Want to see what the agent produced before tests/judge run** — pass `--keep-workspace` to the harness; it prints the workspace path and leaves it on disk. The same data is also in `results/<timestamp>-...json` regardless.
+
+**Docker build fails with NuGet path errors** — make sure `agents/csharp-sk/.dockerignore` is present (ships with the repo). It excludes host `bin/obj/` directories whose `project.assets.json` carries hardcoded Windows NuGet paths that break Linux container builds.
 
 ---
 
-## 13. Costs and safety notes
+## 14. Costs and safety notes
 
 - The C# **oracle** and **xUnit tests** cost nothing. You can fully verify the bench's mechanics without an API key (`--oracle --no-judge`).
 - The **judge** uses gpt-4o-mini by default. Each judge call costs roughly **$0.001–0.005** depending on how long the candidate's report is.
 - A full **agent benchmark run** (Task 006, `gpt-4o-mini`, default 25 steps) typically costs **a few cents**. Increase `--max-steps` carefully.
-- Your API key is read from `.env`, which is in `.gitignore`. It is never written to logs, test artefacts, or workspace files by this code.
+- The one-button reproducer in `local` mode costs **~$0.003 per run**; `docker` mode adds the Python baseline for **~$0.005 total per run**.
+- Your API key is read from `.env`, which is in `.gitignore`. It is never written to logs, test artefacts, workspace files, or `results/` JSONs by this code.
 - The bundled datasets are **synthetic**. No real customer data is present.
 
 ---
 
-## 14. Reproducing the data
+## 15. Reproducing the data
 
 ### Task 001 — `tasks/aml-transaction-network/environment/data/transfers.csv`
 
@@ -571,7 +700,7 @@ dotnet run --project src\AmlAgent.Oracle -- --input <transfers.csv> --output <am
 python scripts\generate_synthetic_aml_data.py
 ```
 
-This is the only remaining Python file in the runtime path. It is deterministic (`random.seed(42)`).
+The only Python file in the data-generation path. Deterministic (`random.seed(42)`).
 
 ### Task 006 — `tasks/task-006-temporal-network-anomaly-detection/environment/data/weekly_transfers.csv`
 
@@ -579,7 +708,7 @@ Hand-crafted to be deterministic and small. Commit it directly; no generator scr
 
 ---
 
-## 15. License & data disclaimer
+## 16. License & data disclaimer
 
 Source code: see [LICENSE](LICENSE).
 
@@ -594,11 +723,16 @@ git pull
 dotnet build AML-Agent-Bench.sln
 ```
 
-If new task folders appear, they pick up automatically — the harness discovers tasks by directory name under `tasks/`. New xUnit test classes also pick up automatically when they're under `tests/AmlAgent.Tests/`.
+If new task folders appear they pick up automatically — the harness discovers tasks by directory name under `tasks/`. New xUnit test classes also pick up automatically when they're under `tests/AmlAgent.Tests/`.
 
 ## Getting help
 
 - For the C# / SK agent specifics, see [agents/csharp-sk/README.md](agents/csharp-sk/README.md).
 - For benching external agents, see [submissions/README.md](submissions/README.md).
+- For the Python baseline submission, see [submissions/python-baseline/README.md](submissions/python-baseline/README.md).
+- For the per-run result format, see [results/README.md](results/README.md).
 - For the research framing, see [docs/research-problem.md](docs/research-problem.md).
-- File an issue on the GitHub repo with the workspace path (`--keep-workspace`) and the `OVERALL` line from the harness.
+- For reproducer flow, see [docs/reproduce.md](docs/reproduce.md).
+- For first cross-model and cross-language data, see [docs/preliminary-results.md](docs/preliminary-results.md).
+- For the rehearsed supervisor demo, see [docs/demo-script.md](docs/demo-script.md).
+- File an issue on the GitHub repo with the workspace path (`--keep-workspace`) or the relevant `results/<...>.json` and the `OVERALL` line from the harness.
