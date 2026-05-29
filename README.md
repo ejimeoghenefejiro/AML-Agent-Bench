@@ -76,6 +76,19 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 
 ## 2. What's in the box
 
+### The four projects, in plain English
+
+| Project | What it is | Exam analogy |
+|---|---|---|
+| **AmlAgent** | The AI agent that does the AML task (and also acts as the LLM judge that grades the report). | The **candidate** sitting the exam — and a second reviewer who grades the written answer. |
+| **AmlAgent.Harness** | The runner: builds everything, runs the agent, scores it, writes results. | The **invigilator** — runs the exam and marks the candidate. |
+| **AmlAgent.Oracle** | A hand-written correct answer used to sanity-check the bench. | The **marking scheme** — the known-correct answers, used to prove the bench itself works. |
+| **AmlAgent.Tests** | Rule-based tests (xUnit) that check the agent's output is correct. | The **rubric** — the deterministic rules every answer must satisfy. |
+
+**Put together:** the **Harness** (invigilator) gives the **Agent** (candidate) the AML task, then marks its output using the **Tests** (rubric) and the **Agent-as-judge** (reviewer). The **Oracle** (marking scheme) is the gold-standard answer used to prove the marking process itself is sound.
+
+### Full layer map
+
 | Layer | Implementation | Purpose |
 |---|---|---|
 | **Reference agent** | `agents/csharp-sk/` — .NET 8 + Microsoft Semantic Kernel | The primary subject of the PhD investigation; tool-calling agent with `run`, `chat`, and `judge` subcommands |
