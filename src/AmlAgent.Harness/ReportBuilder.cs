@@ -31,7 +31,7 @@ internal static class ReportBuilder
         int AgentExitCode, int XUnitExitCode, int JudgeExitCode,
         bool JudgeWasRun);
 
-    public static void Build(
+    public static JsonObject Build(
         string workspace,
         string repoRoot,
         RunMeta meta,
@@ -88,6 +88,8 @@ internal static class ReportBuilder
         {
             Console.Error.WriteLine($"[harness] could not write results/ archival copy: {ex.Message}");
         }
+
+        return root;
     }
 
     private static JsonObject CollectAgentOutputs(string workspace)
@@ -185,31 +187,45 @@ internal static class ReportBuilder
             XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
             var doc = XDocument.Load(trxPath);
 
-            var summary = doc.Descendants(ns + "ResultSummary").FirstOrDefault();
-            var counters = summary?.Element(ns + "Counters");
-            if (counters != null)
-            {
-                result["total"] = (int?)counters.Attribute("total") ?? 0;
-                result["passed"] = (int?)counters.Attribute("passed") ?? 0;
-                result["failed"] = (int?)counters.Attribute("failed") ?? 0;
-                result["skipped"] = (int?)counters.Attribute("notExecuted") ?? 0;
-            }
-
+            // Count directly from each test's own <UnitTestResult outcome="...">
+            // rather than the rollup <Counters> element: Xunit.SkippableFact's
+            // skips land as outcome="NotExecuted" on individual results, but
+            // the rollup's own notExecuted counter does not reliably reflect
+            // that for this skip mechanism (observed: rollup said 0 skipped
+            // while 13 individual results were NotExecuted). <RunInfo> and
+            // <ResultSummary> elements also carry an unrelated "outcome"
+            // attribute, so this scopes strictly to UnitTestResult.
+            var unitResults = doc.Descendants(ns + "UnitTestResult").ToList();
+            int passed = 0, failed = 0, skipped = 0, other = 0;
             var failures = new JsonArray();
-            foreach (var r in doc.Descendants(ns + "UnitTestResult"))
+            foreach (var r in unitResults)
             {
                 var outcome = (string?)r.Attribute("outcome");
-                if (outcome != "Failed") continue;
-                var name = (string?)r.Attribute("testName");
-                var err = r.Element(ns + "Output")?.Element(ns + "ErrorInfo");
-                failures.Add(new JsonObject
+                switch (outcome)
                 {
-                    ["test_name"] = name,
-                    ["duration"] = (string?)r.Attribute("duration"),
-                    ["message"] = (string?)err?.Element(ns + "Message"),
-                    ["stack_trace"] = (string?)err?.Element(ns + "StackTrace"),
-                });
+                    case "Passed": passed++; break;
+                    case "NotExecuted": skipped++; break;
+                    case "Failed":
+                        failed++;
+                        var name = (string?)r.Attribute("testName");
+                        var err = r.Element(ns + "Output")?.Element(ns + "ErrorInfo");
+                        failures.Add(new JsonObject
+                        {
+                            ["test_name"] = name,
+                            ["duration"] = (string?)r.Attribute("duration"),
+                            ["message"] = (string?)err?.Element(ns + "Message"),
+                            ["stack_trace"] = (string?)err?.Element(ns + "StackTrace"),
+                        });
+                        break;
+                    default: other++; break;
+                }
             }
+
+            result["total"] = unitResults.Count;
+            result["passed"] = passed;
+            result["failed"] = failed;
+            result["skipped"] = skipped;
+            if (other > 0) result["other_outcomes"] = other;
             result["failures"] = failures;
             result["trx_present"] = true;
         }

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AmlAgent.Oracle;
 
 namespace AmlAgent.Harness;
@@ -168,10 +170,10 @@ public static class Program
                 XUnitExitCode: testRc,
                 JudgeExitCode: judgeRc,
                 JudgeWasRun: !skipJudge && File.Exists(rubricPath));
-            ReportBuilder.Build(workspace, repoRoot, meta, outcomes, trxPath);
+            var report = ReportBuilder.Build(workspace, repoRoot, meta, outcomes, trxPath);
+            PrintSummaryTables(report);
 
             var overall = (testRc == 0 && judgeRc == 0) ? 0 : 1;
-            Console.WriteLine($"\n[harness] OVERALL: {(overall == 0 ? "PASS" : "FAIL")} (xunit={testRc} judge={judgeRc})");
             return overall;
         }
         finally
@@ -398,6 +400,115 @@ public static class Program
             return $"{name}=***REDACTED***";
         return arg;
     }
+
+    /// <summary>
+    /// Prints a clean, aligned recap of the run — judge scoring (including
+    /// EGHR and evidence traceability), xUnit results, and the overall
+    /// verdict — as plain-ASCII tables. Read straight off the same
+    /// bench_result.json ReportBuilder just wrote, so it never drifts from
+    /// what's archived to results/. Kept separate from the live per-step
+    /// agent trace (which streams from the agent's own process) so a demo
+    /// still shows the agent working in real time before this final recap.
+    /// </summary>
+    private static void PrintSummaryTables(JsonObject report)
+    {
+        Console.WriteLine();
+        Console.WriteLine("==================== RUN SUMMARY ====================");
+
+        var agentObj = report["agent"]?.AsObject();
+        Console.WriteLine($"Task  : {(string?)report["task"]}");
+        Console.WriteLine($"Agent : {(string?)agentObj?["name"]}  ({(string?)agentObj?["mode"]})");
+        Console.WriteLine($"Model : {(string?)agentObj?["model"] ?? "(default)"}");
+
+        var judge = report["judge"]?.AsObject();
+        if (judge is not null && judge["scores"] is not null)
+        {
+            var rows = new List<string[]>
+            {
+                new[] { "Rubric score", $"{(int?)judge["overall_score"]}/{(int?)judge["overall_max"]} ({(double?)judge["overall_percentage"]:P1})" },
+                new[] { "Rubric verdict", (string?)judge["verdict"] ?? "-" },
+            };
+
+            var eghr = judge["eghr"]?.AsObject();
+            if (eghr is not null)
+                rows.Add(new[] { "EGHR", $"{(double?)eghr["rate"]:P1} ({(int?)eghr["unsupported_count"]} unsupported + {(int?)eghr["contradicted_count"]} contradicted / {(int?)eghr["total_claims"]} claims)" });
+
+            var trace = judge["evidence_traceability"]?.AsObject();
+            if (trace is not null)
+            {
+                rows.Add(new[] { "Evidence traceability precision", FormatPercentOrNa(trace["precision"]) });
+                var goldTotal = (int?)trace["gold_evidence_total"];
+                var matched = (int?)trace["matched_gold_citations"] ?? 0;
+                rows.Add(new[] { "Evidence traceability recall", $"{FormatPercentOrNa(trace["recall"])} ({matched}/{(goldTotal?.ToString() ?? "0")} gold citations)" });
+            }
+
+            PrintTable("Judge scoring", new[] { "Metric", "Value" }, rows);
+        }
+        else
+        {
+            Console.WriteLine("\n-- Judge scoring: not run for this task --");
+        }
+
+        var xunit = report["xunit"]?.AsObject();
+        if (xunit is not null)
+        {
+            PrintTable("xUnit", new[] { "Outcome", "Count" }, new List<string[]>
+            {
+                new[] { "Passed", $"{(int?)xunit["passed"] ?? 0}" },
+                new[] { "Skipped", $"{(int?)xunit["skipped"] ?? 0}" },
+                new[] { "Failed", $"{(int?)xunit["failed"] ?? 0}" },
+                new[] { "Total", $"{(int?)xunit["total"] ?? 0}" },
+            });
+
+            var failures = xunit["failures"]?.AsArray();
+            if (failures is not null && failures.Count > 0)
+            {
+                var failRows = failures
+                    .Select(f => new[] { (string?)f?["test_name"] ?? "?", (string?)f?["message"] ?? "" })
+                    .ToList();
+                PrintTable("xUnit failures", new[] { "Test", "Message" }, failRows);
+            }
+        }
+
+        var overallVerdict = (string?)report["overall_verdict"] ?? "-";
+        var judgeExitDisplay = judge is null ? "n/a (no rubric)"
+            : (bool?)judge["was_run"] == false ? "n/a (skipped)"
+            : (string?)judge["verdict"] == "PASS" ? "0 (PASS)"
+            : "1 (FAIL)";
+        var xunitExitDisplay = xunit is null ? "n/a" : $"{(int?)xunit["exit_code"] ?? 0} ({(string?)xunit["verdict"]})";
+
+        PrintTable("Overall", new[] { "Field", "Value" }, new List<string[]>
+        {
+            new[] { "Agent exit", $"{(int?)report["agent_exit_code"] ?? 0}" },
+            new[] { "xUnit exit", xunitExitDisplay },
+            new[] { "Judge exit", judgeExitDisplay },
+            new[] { "OVERALL", overallVerdict },
+            new[] { "Reason", (string?)report["overall_reason"] ?? "-" },
+        });
+        Console.WriteLine("=======================================================");
+    }
+
+    private static string FormatPercentOrNa(JsonNode? node)
+    {
+        if (node is null || node.GetValueKind() == JsonValueKind.Null) return "n/a";
+        return $"{node.GetValue<double>():P1}";
+    }
+
+    private static void PrintTable(string title, string[] headers, IReadOnlyList<string[]> rows)
+    {
+        var widths = headers
+            .Select((h, i) => Math.Max(h.Length, rows.Count == 0 ? 0 : rows.Max(r => r[i].Length)))
+            .ToArray();
+
+        Console.WriteLine();
+        Console.WriteLine($"-- {title} --");
+        PrintTableRow(headers, widths);
+        Console.WriteLine(string.Join("-+-", widths.Select(w => new string('-', w))));
+        foreach (var r in rows) PrintTableRow(r, widths);
+    }
+
+    private static void PrintTableRow(string[] cells, int[] widths) =>
+        Console.WriteLine(string.Join(" | ", cells.Select((c, i) => c.PadRight(widths[i]))));
 
     private static string? FindRepoRoot()
     {
