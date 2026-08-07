@@ -258,8 +258,15 @@ public static class Program
         var agentDir = Path.Combine(repoRoot, "agents", agent);
         if (!Directory.Exists(agentDir))
             throw new InvalidOperationException($"agent not found: {agentDir}");
+        var dockerfilePath = Path.Combine(agentDir, "Dockerfile");
+        if (!File.Exists(dockerfilePath))
+            throw new InvalidOperationException($"no Dockerfile: {dockerfilePath}");
         var defaultTag = $"aml-bench-agent-{agent}:latest";
-        var brc = RunProcess("docker", new[] { "build", "-t", defaultTag, agentDir });
+        // Build context is the REPO ROOT, not agentDir: agents/csharp-sk's
+        // AmlAgent.csproj references ../../src/AmlAgent.Evidence/, which
+        // must be visible to the build. The root .dockerignore keeps the
+        // upload small; each Dockerfile COPYs only the paths it needs.
+        var brc = RunProcess("docker", new[] { "build", "-t", defaultTag, "-f", dockerfilePath, repoRoot });
         if (brc != 0) throw new InvalidOperationException("agent image build failed");
         return defaultTag;
     }
@@ -369,10 +376,27 @@ public static class Program
         foreach (var a in args) psi.ArgumentList.Add(a);
         if (env is not null) foreach (var (k, v) in env) psi.Environment[k] = v;
 
-        Console.WriteLine($"$ {file} {string.Join(' ', args)}");
+        Console.WriteLine($"$ {file} {string.Join(' ', args.Select(RedactForLog))}");
         using var p = Process.Start(psi)!;
         p.WaitForExit();
         return p.ExitCode;
+    }
+
+    /// <summary>
+    /// Redacts the value of any "NAME=value" argument whose name looks like
+    /// a secret (KEY/TOKEN/SECRET/PASSWORD), so echoed commands — e.g.
+    /// `docker run -e OPENAI_API_KEY=...` — never print credentials to the
+    /// console or any captured log/transcript.
+    /// </summary>
+    private static string RedactForLog(string arg)
+    {
+        var eq = arg.IndexOf('=');
+        if (eq <= 0) return arg;
+        var name = arg[..eq];
+        var upper = name.ToUpperInvariant();
+        if (upper.Contains("KEY") || upper.Contains("TOKEN") || upper.Contains("SECRET") || upper.Contains("PASSWORD"))
+            return $"{name}=***REDACTED***";
+        return arg;
     }
 
     private static string? FindRepoRoot()

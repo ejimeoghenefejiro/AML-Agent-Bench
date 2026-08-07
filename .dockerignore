@@ -1,0 +1,23 @@
+# Root .dockerignore — applies to any `docker build` whose context is the
+# repo root (agents/csharp-sk/Dockerfile now builds from here, because
+# AmlAgent.csproj references ../../src/AmlAgent.Evidence/, which must be
+# visible to the build; see src/AmlAgent.Harness/Program.cs ResolveAgentImage).
+#
+# Host build outputs must NOT leak into the image: obj/project.assets.json
+# hardcodes Windows-specific NuGet fallback paths that break `dotnet restore`
+# / `dotnet publish` inside a Linux container. Always rebuild from scratch.
+**/bin/
+**/obj/
+
+# IDE / editor noise
+.vs/
+*.user
+
+# Local secrets — never ship into an image
+.env
+
+# Not needed inside any agent image; excluding keeps the build context small
+.git/
+results/
+submissions/
+Proposal/
