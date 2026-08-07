@@ -164,7 +164,7 @@ internal static class JudgeAgent
         history.AddUserMessage(user.ToString());
 
         Console.WriteLine($"[judge] model={model} rubric={rubricPath}");
-        var response = await chat.GetChatMessageContentAsync(history, settings, kernel);
+        var response = await chat.GetChatMessageContentWithRetryAsync(history, settings, kernel, "judge");
         var raw = response.Content ?? "";
 
         JsonNode parsed;

@@ -38,7 +38,7 @@ internal static class BenchmarkAgent
         for (int step = 1; step <= maxSteps; step++)
         {
             Console.WriteLine($"--- step {step} ---");
-            var response = await chat.GetChatMessageContentAsync(history, settings, kernel);
+            var response = await chat.GetChatMessageContentWithRetryAsync(history, settings, kernel, "benchmark");
             var text = response.Content ?? "";
             Console.WriteLine(text);
             history.AddAssistantMessage(text);

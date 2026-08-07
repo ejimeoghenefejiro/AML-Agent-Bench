@@ -20,14 +20,27 @@ public static class Program
         var cmd = args[0].ToLowerInvariant();
         var rest = args.Skip(1).ToArray();
 
-        return cmd switch
+        try
         {
-            "run"   => await BenchmarkAgent.RunAsync(rest),
-            "chat"  => await ChatAgent.RunAsync(rest),
-            "judge" => await JudgeAgent.RunAsync(rest),
-            "-h" or "--help" or "help" => Help(),
-            _ => Unknown(cmd),
-        };
+            return cmd switch
+            {
+                "run"   => await BenchmarkAgent.RunAsync(rest),
+                "chat"  => await ChatAgent.RunAsync(rest),
+                "judge" => await JudgeAgent.RunAsync(rest),
+                "-h" or "--help" or "help" => Help(),
+                _ => Unknown(cmd),
+            };
+        }
+        catch (Exception ex)
+        {
+            // A clean one-line failure instead of the CLR's default
+            // unhandled-exception dump (40+ lines of stack trace) — the
+            // real exception type/message is still shown, just not the
+            // full .NET internals. RetryHelper already absorbed transient
+            // network blips before this is ever reached.
+            Console.Error.WriteLine($"[{cmd}] failed: {ex.GetType().Name}: {ex.Message}");
+            return 70; // EX_SOFTWARE
+        }
     }
 
     private static int Help() { PrintUsage(); return 0; }
