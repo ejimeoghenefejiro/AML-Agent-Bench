@@ -5,16 +5,21 @@ below has been run and verified on the author's machine on 2026-08-07;
 expected output snippets are included so a missed line is obvious in real
 time.
 
-**Important — read before the viva:** the live agent run is *stochastic*.
-Across 4 test runs on 2026-08-07, the harness's `OVERALL` verdict was PASS
-once and FAIL three times — the agent writes its own scoring code each run,
-so `week_3 anomaly_score >= 0.7` sometimes lands below threshold. **Do not
-present this as a coin flip you're hoping wins.** Structure the demo so a
-FAIL is an expected, explained outcome, not a surprise — see "the layered
-narrative" below. The EGHR and evidence-traceability numbers (the actual
-primary-contribution metrics) are produced by the judge independently of
-that xUnit gate and were stable across all 4 runs (EGHR 33–50%, traceability
-precision 33.3% / recall 7.7% every time) — those are the numbers to lean on.
+**Important — read before the viva:** the live agent run is still
+*stochastic* in principle (the agent writes its own scoring code each run),
+but as of 2026-08-07 the task prompt was fixed to actually tell the agent
+the `week_3 anomaly_score >= 0.7` calibration target — it was previously
+only implied in a file (`expected-behaviour.md`) the agent never read.
+After that fix, 8 of 9 live runs passed `OVERALL` (89%), up from roughly 1
+in 4-5 before. It should PASS most of the time now, but it is still a real
+LLM call — don't promise a guaranteed PASS to the examiners; if it FAILs,
+treat it exactly as "the layered narrative" below describes (an expected,
+explained outcome, not a bug). The EGHR and evidence-traceability numbers
+(the actual primary-contribution metrics) are produced by the judge
+independently of that xUnit gate and are worth leaning on regardless of
+which way the gate goes — see docs/preliminary-results.md for worked
+examples, including one run where the rubric scored a report 30/30 while
+EGHR found 5 of 8 claims unsupported.
 
 **Prerequisites on the demo machine:**
 

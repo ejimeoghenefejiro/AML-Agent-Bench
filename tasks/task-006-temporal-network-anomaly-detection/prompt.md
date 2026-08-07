@@ -24,7 +24,7 @@ Rules:
 - `start_date` and `end_date` are `YYYY-MM-DD`.
 - `new_accounts_count` is the number of accounts that appear for the first time in this week (i.e. were not seen in any earlier week).
 - `high_risk_dest_count` is the number of transfers whose `destination_country` is in `{AE, RU, CY, NG, TR}`.
-- `anomaly_score` is between 0 and 1, rounded to 4 decimal places. Higher = more anomalous compared with the earliest week. Week 1 should have the lowest anomaly score.
+- `anomaly_score` is between 0 and 1, rounded to 4 decimal places, and must be **strictly increasing** across the three weeks (`week_1 < week_2 < week_3`). Calibrate it to this scale: week 1 (baseline, no new intermediaries, no high-risk destinations) should score close to **0.0**; week 3 (exit to high-risk jurisdictions) should score **at least 0.7**, reflecting a severe anomaly. A simple approach that reliably hits this scale: normalise a composite of `new_accounts_count`, `high_risk_dest_count` and `sar_count` using min-max scaling across the three weeks, so the most anomalous week lands near 1.0.
 - All numeric values rounded to 4 decimal places.
 
 ### 2. `temporal_anomaly_report.md` (LLM-judged)

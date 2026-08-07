@@ -56,7 +56,15 @@ internal static class BenchmarkAgent
 
     private static string? ResolveInstructionFile(string taskDir)
     {
-        foreach (var name in new[] { "instruction.md", "prompt.md" })
+        // prompt.md first: newer tasks (e.g. task-006) ship prompt.md as the
+        // full, canonical spec and instruction.md as a thin pointer to it
+        // ("See prompt.md") for agents that only look for instruction.md.
+        // Preferring prompt.md when both exist hands the agent the real
+        // spec directly instead of relying on it to notice and follow the
+        // pointer via its own tool calls. Older tasks (e.g.
+        // aml-transaction-network) have no prompt.md, so this still falls
+        // through to instruction.md unchanged for them.
+        foreach (var name in new[] { "prompt.md", "instruction.md" })
         {
             var p = Path.Combine(taskDir, name);
             if (File.Exists(p)) return p;
