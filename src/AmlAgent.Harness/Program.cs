@@ -420,9 +420,13 @@ public static class Program
         Console.WriteLine($"Agent : {(string?)agentObj?["name"]}  ({(string?)agentObj?["mode"]})");
         Console.WriteLine($"Model : {(string?)agentObj?["model"] ?? "(default)"}");
 
+        PrintSectionBanner("AGENT OUTPUT — what the agent actually produced, before any judging");
+        PrintAgentOutputSection(report);
+
         var judge = report["judge"]?.AsObject();
         if (judge is not null && judge["scores"] is not null)
         {
+            PrintSectionBanner("JUDGE EVALUATION — the LLM-as-judge's assessment of the output above");
             PrintJudgeOverview(judge);
             PrintRubricDimensionTables(judge);
             PrintEghrTables(judge);
@@ -430,12 +434,14 @@ public static class Program
         }
         else
         {
-            Console.WriteLine("\n-- Judge scoring: not run for this task --");
+            PrintSectionBanner("JUDGE EVALUATION");
+            Console.WriteLine("-- not run for this task --");
         }
 
         var xunit = report["xunit"]?.AsObject();
         if (xunit is not null)
         {
+            PrintSectionBanner("STRUCTURAL TESTS (xUnit) — deterministic checks, independent of the judge");
             PrintTable("xUnit", new[] { "Outcome", "Count" }, new List<string[]>
             {
                 new[] { "Passed", $"{(int?)xunit["passed"] ?? 0}" },
@@ -461,6 +467,7 @@ public static class Program
             : "1 (FAIL)";
         var xunitExitDisplay = xunit is null ? "n/a" : $"{(int?)xunit["exit_code"] ?? 0} ({(string?)xunit["verdict"]})";
 
+        PrintSectionBanner("OVERALL");
         PrintTable("Overall", new[] { "Field", "Value" }, new List<string[]>
         {
             new[] { "Agent exit", $"{(int?)report["agent_exit_code"] ?? 0}" },
@@ -470,6 +477,60 @@ public static class Program
             new[] { "Reason", (string?)report["overall_reason"] ?? "-" },
         });
         Console.WriteLine("=======================================================");
+    }
+
+    private static void PrintSectionBanner(string title)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"---------------------- {title} ----------------------");
+    }
+
+    /// <summary>
+    /// Prints exactly what the agent produced — the raw CSV rows and the raw
+    /// report text — before any judge/xUnit result, so a reader can see the
+    /// agent's own work first and then compare it against how it was scored.
+    /// Reads report["agent_outputs"], which ReportBuilder.CollectAgentOutputs
+    /// already populated from the workspace files.
+    /// </summary>
+    private static void PrintAgentOutputSection(JsonObject report)
+    {
+        var outputs = report["agent_outputs"]?.AsObject();
+        if (outputs is null || outputs.Count == 0)
+        {
+            Console.WriteLine("-- no output files found --");
+            return;
+        }
+
+        foreach (var (name, node) in outputs)
+        {
+            var obj = node?.AsObject();
+            if (obj is null) continue;
+            var size = (long?)obj["size_bytes"] ?? 0;
+
+            if (obj["rows"] is JsonArray rows && rows.Count > 0)
+            {
+                var headers = rows[0]!.AsObject().Select(kv => kv.Key).ToArray();
+                var dataRows = rows
+                    .Select(r => headers.Select(h => r?[h]?.ToString() ?? "").ToArray())
+                    .ToList();
+                PrintTable($"{name}  ({size} bytes)", headers, dataRows);
+            }
+            else if (obj["content_preview"] is JsonValue previewNode)
+            {
+                var text = previewNode.GetValue<string>();
+                var citationCount = (int?)obj["citation_count"];
+                var citationNote = citationCount is int c ? $", {c} txn-ID citations found by regex" : "";
+                Console.WriteLine();
+                Console.WriteLine($"-- {name}  ({size} bytes{citationNote}) --");
+                foreach (var line in text.Replace("\r\n", "\n").Split('\n'))
+                    Console.WriteLine($"   {line}");
+            }
+            else
+            {
+                Console.WriteLine();
+                Console.WriteLine($"-- {name}  ({size} bytes) — binary or unrecognised format, not previewed --");
+            }
+        }
     }
 
     /// <summary>Quick-scan headline numbers — the five figures people ask about first.</summary>
@@ -517,13 +578,25 @@ public static class Program
             PrintTable("Rubric — per-dimension scores (sums to the overall score above)", new[] { "Dimension", "Score", "Reasoning" }, rows);
         }
 
-        PrintTable("Rubric — verdict arithmetic", new[] { "Field", "Value" }, new List<string[]>
+        var overallScore = (int?)judge["overall_score"] ?? 0;
+        var overallMax = (int?)judge["overall_max"] ?? 0;
+        var percentage = (double?)judge["overall_percentage"];
+        var threshold = (double?)judge["pass_threshold_overall"];
+        var verdict = (string?)judge["verdict"] ?? "-";
+
+        var comparison = percentage is double p && threshold is double t
+            ? $"{p:P1} {(p >= t ? ">=" : "<")} {t:P1} threshold  =>  {(p >= t ? "PASS" : "FAIL")}"
+            : "n/a";
+
+        PrintTable("Rubric — verdict arithmetic (why the verdict is what it is)", new[] { "Field", "Value" }, new List<string[]>
         {
-            new[] { "Overall score", $"{(int?)judge["overall_score"]}" },
-            new[] { "Overall max", $"{(int?)judge["overall_max"]}" },
-            new[] { "Overall percentage", FormatPercentOrNa(judge["overall_percentage"]) },
+            new[] { "Overall score", $"{overallScore}  (sum of the six dimension scores above)" },
+            new[] { "Overall max", $"{overallMax}  (sum of the six dimension maxes)" },
+            new[] { "Overall percentage", $"{FormatPercentOrNa(judge["overall_percentage"])}  ({overallScore}/{overallMax})" },
             new[] { "Pass threshold", FormatPercentOrNa(judge["pass_threshold_overall"]) },
-            new[] { "Verdict", (string?)judge["verdict"] ?? "-" },
+            new[] { "Rule", "verdict = PASS if overall percentage >= pass threshold, else FAIL" },
+            new[] { "Comparison", comparison },
+            new[] { "Verdict", verdict },
         });
     }
 
