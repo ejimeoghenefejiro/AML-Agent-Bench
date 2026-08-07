@@ -26,10 +26,11 @@ If it doesn't, stop and fix — never demo a red build.
 
 ### 1. Show the proposal and the abstract (30 s)
 
-Open in Word: `C:\PHD\AML-Agent-Bench\Proposal\PhD-Proposal-AML-Agent-Bench.docx`.
+Open: `C:\PHD\AML-Agent-Bench\Proposal\Oghenefejiro Ejime - PhD Research Proposal.pdf`.
 
 Or on screen, open the README's abstract section in any markdown viewer and
-read the three research questions aloud.
+read the primary research question (hallucination + evidence traceability)
+aloud, then the six-dimension table.
 
 ### 2. "No-cost" sanity — the reference oracle (~10 s)
 
