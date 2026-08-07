@@ -258,20 +258,15 @@ Slash commands: `/exit`, `/reset`, `/help`.
 ### 5.3 Full benchmark run — `--local` mode (no Docker)
 
 ```cmd
-dotnet run --project src\AmlAgent.Harness -- ^
-    --agent csharp-sk ^
-    --task task-006-temporal-network-anomaly-detection ^
-    --local
+dotnet run --project src\AmlAgent.Harness --no-build -- --task task-006 --local
 ```
 
-The harness stages a workspace, runs the C# agent via `dotnet run` on the host, then runs the judge and xUnit and writes `bench_result.json`. No Docker required.
+`--agent csharp-sk` is the default so it can be omitted, and `--task` accepts a unique prefix (`task-006` resolves to `task-006-temporal-network-anomaly-detection`). The harness stages a workspace, runs the C# agent via `dotnet run` on the host, then runs the judge and xUnit and writes `bench_result.json`. No Docker required.
 
 ### 5.4 Full benchmark run — Docker mode
 
 ```cmd
-dotnet run --project src\AmlAgent.Harness -- ^
-    --agent csharp-sk ^
-    --task task-006-temporal-network-anomaly-detection
+dotnet run --project src\AmlAgent.Harness -- --task task-006
 ```
 
 What the harness does:
@@ -671,7 +666,7 @@ dotnet run --project src\AmlAgent.Harness -- [agent-source] [--task <id>] [optio
 | `--agent-image <tag>` | Use a **pre-built** Docker image as the agent (no build step). |
 | `--submission <path>` | Build the `Dockerfile` in a local folder (typically `submissions/<name>`). |
 | `--local` | Run the in-repo C# agent directly via `dotnet run` (no Docker). Cannot combine with `--agent-image` / `--submission`. |
-| `--task <id>` | Task folder under `tasks/`. Default: `aml-transaction-network`. |
+| `--task <id>` | Task folder under `tasks/`. Default: `aml-transaction-network`. Accepts a unique prefix too — `--task task-006` or `--task 006` both resolve to `task-006-temporal-network-anomaly-detection` as long as the prefix is unambiguous. |
 | `--model <id>` | Override `BENCH_MODEL`. |
 | `--max-steps <n>` | Override `BENCH_MAX_STEPS`. |
 | `--oracle` | Skip the agent; produce output via `AmlAgent.Oracle`. Only valid for `aml-transaction-network`. |

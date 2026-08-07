@@ -65,8 +65,9 @@ public static class Program
         var repoRoot = FindRepoRoot()
             ?? throw new InvalidOperationException("Could not locate repo root (looking for AML-Agent-Bench.sln)");
 
-        var taskDir = Path.Combine(repoRoot, "tasks", task);
-        if (!Directory.Exists(taskDir)) { Console.Error.WriteLine($"task not found: {taskDir}"); return 1; }
+        var taskDir = ResolveTaskDir(repoRoot, task);
+        if (taskDir is null) { Console.Error.WriteLine($"task not found: tasks/{task} (or any unique prefix match)"); return 1; }
+        task = Path.GetFileName(taskDir)!; // normalise to the canonical full task id for everything downstream
 
         var runId = Guid.NewGuid().ToString("N");
         var startedUtc = DateTime.UtcNow;
@@ -194,6 +195,7 @@ public static class Program
         Console.WriteLine();
         Console.WriteLine("Other options:");
         Console.WriteLine("  --task <id>              task dir under tasks/ (default: aml-transaction-network)");
+        Console.WriteLine("                           accepts a unique prefix, e.g. --task task-006 or --task 006");
         Console.WriteLine("  --model <id>             override BENCH_MODEL for the agent container");
         Console.WriteLine("  --max-steps <n>          cap on agent turns (default: 25)");
         Console.WriteLine("  --keep-workspace         keep the temp workspace dir after exit");
@@ -202,6 +204,36 @@ public static class Program
         Console.WriteLine("  --local                  run the in-repo agent directly via `dotnet run` instead of Docker");
         Console.WriteLine("                           (only valid with --agent <name>; cannot combine with --agent-image / --submission)");
         Console.WriteLine("  --no-judge               skip the LLM-as-judge rubric stage");
+    }
+
+    /// <summary>
+    /// Resolves a --task value to a tasks/&lt;dir&gt; path. Tries an exact match
+    /// first; if that fails, tries a unique prefix match (case-insensitive)
+    /// against "&lt;task&gt;" and "task-&lt;task&gt;", so shorthand like
+    /// "--task task-006" or "--task 006" resolves to
+    /// "task-006-temporal-network-anomaly-detection" as long as it's unique.
+    /// Returns null if nothing matches or the match is ambiguous.
+    /// </summary>
+    private static string? ResolveTaskDir(string repoRoot, string task)
+    {
+        var tasksRoot = Path.Combine(repoRoot, "tasks");
+        var exact = Path.Combine(tasksRoot, task);
+        if (Directory.Exists(exact)) return exact;
+
+        if (!Directory.Exists(tasksRoot)) return null;
+
+        var prefixes = new[] { task, $"task-{task}" };
+        var candidates = Directory.GetDirectories(tasksRoot)
+            .Select(Path.GetFileName)
+            .Where(name => name is not null && prefixes.Any(p =>
+                name.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+            .Distinct()
+            .ToList();
+
+        if (candidates.Count == 1) return Path.Combine(tasksRoot, candidates[0]!);
+        if (candidates.Count > 1)
+            Console.Error.WriteLine($"[harness] ambiguous task '{task}' matches: {string.Join(", ", candidates)} — use the full task id");
+        return null;
     }
 
     private static string ResolveAgentImage(string repoRoot, string agent, string? agentImage, string? submission)
