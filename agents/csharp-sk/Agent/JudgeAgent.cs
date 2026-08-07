@@ -10,9 +10,9 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 namespace AmlAgent.Agent;
 
-/// <summary>
-/// LLM-as-judge subcommand. Loads a task rubric, the candidate's outputs from
-/// a benchmark workspace and the grounding data, then asks the Semantic Kernel
+// <summary>
+// LLM-as-judge subcommand. Loads a task rubric, the candidate's outputs from
+// a benchmark workspace and the grounding data, then asks the Semantic Kernel
 /// chat model to score the candidate against each rubric dimension and emit
 /// structured JSON. The result is written to &lt;workspace&gt;/judge_report.json
 /// and is also validated by xUnit in tests/AmlAgent.Tests/JudgeReportTests.cs.
@@ -32,8 +32,8 @@ namespace AmlAgent.Agent;
 ///   - Evidence traceability (citation precision/recall): computed entirely
 ///     deterministically by regex-matching cited transaction IDs in the
 ///     report against a curated gold-evidence set (rubric's
-///     "gold_evidence_annotations"), no LLM involved.
-/// </summary>
+//     "gold_evidence_annotations"), no LLM involved.
+// </summary>
 internal static class JudgeAgent
 {
     public static async Task<int> RunAsync(string[] args)
