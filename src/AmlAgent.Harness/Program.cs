@@ -423,26 +423,10 @@ public static class Program
         var judge = report["judge"]?.AsObject();
         if (judge is not null && judge["scores"] is not null)
         {
-            var rows = new List<string[]>
-            {
-                new[] { "Rubric score", $"{(int?)judge["overall_score"]}/{(int?)judge["overall_max"]} ({(double?)judge["overall_percentage"]:P1})" },
-                new[] { "Rubric verdict", (string?)judge["verdict"] ?? "-" },
-            };
-
-            var eghr = judge["eghr"]?.AsObject();
-            if (eghr is not null)
-                rows.Add(new[] { "EGHR", $"{(double?)eghr["rate"]:P1} ({(int?)eghr["unsupported_count"]} unsupported + {(int?)eghr["contradicted_count"]} contradicted / {(int?)eghr["total_claims"]} claims)" });
-
-            var trace = judge["evidence_traceability"]?.AsObject();
-            if (trace is not null)
-            {
-                rows.Add(new[] { "Evidence traceability precision", FormatPercentOrNa(trace["precision"]) });
-                var goldTotal = (int?)trace["gold_evidence_total"];
-                var matched = (int?)trace["matched_gold_citations"] ?? 0;
-                rows.Add(new[] { "Evidence traceability recall", $"{FormatPercentOrNa(trace["recall"])} ({matched}/{(goldTotal?.ToString() ?? "0")} gold citations)" });
-            }
-
-            PrintTable("Judge scoring", new[] { "Metric", "Value" }, rows);
+            PrintJudgeOverview(judge);
+            PrintRubricDimensionTables(judge);
+            PrintEghrTables(judge);
+            PrintTraceabilityTables(judge);
         }
         else
         {
@@ -487,6 +471,148 @@ public static class Program
         });
         Console.WriteLine("=======================================================");
     }
+
+    /// <summary>Quick-scan headline numbers — the five figures people ask about first.</summary>
+    private static void PrintJudgeOverview(JsonObject judge)
+    {
+        var rows = new List<string[]>
+        {
+            new[] { "Rubric score", $"{(int?)judge["overall_score"]}/{(int?)judge["overall_max"]} ({(double?)judge["overall_percentage"]:P1})" },
+            new[] { "Rubric verdict", (string?)judge["verdict"] ?? "-" },
+        };
+
+        var eghr = judge["eghr"]?.AsObject();
+        if (eghr is not null)
+            rows.Add(new[] { "EGHR", $"{(double?)eghr["rate"]:P1} ({(int?)eghr["unsupported_count"]} unsupported + {(int?)eghr["contradicted_count"]} contradicted / {(int?)eghr["total_claims"]} claims)" });
+
+        var trace = judge["evidence_traceability"]?.AsObject();
+        if (trace is not null)
+        {
+            rows.Add(new[] { "Evidence traceability precision", FormatPercentOrNa(trace["precision"]) });
+            var goldTotal = (int?)trace["gold_evidence_total"] ?? 0;
+            var matched = (int?)trace["matched_gold_citations"] ?? 0;
+            rows.Add(new[] { "Evidence traceability recall", $"{FormatPercentOrNa(trace["recall"])} ({matched}/{goldTotal} gold citations)" });
+        }
+
+        PrintTable("Judge scoring — overview", new[] { "Metric", "Value" }, rows);
+        Console.WriteLine("   (full breakdown of every number below)");
+    }
+
+    /// <summary>
+    /// Drill-down for "Rubric score" / "Rubric verdict": every one of the six
+    /// rubric dimensions that summed to the overall score, plus the pass/fail
+    /// arithmetic itself.
+    /// </summary>
+    private static void PrintRubricDimensionTables(JsonObject judge)
+    {
+        var scores = judge["scores"]?.AsObject();
+        if (scores is not null)
+        {
+            var rows = scores.Select(kv => new[]
+            {
+                kv.Key,
+                $"{(int?)kv.Value?["score"]}/{(int?)kv.Value?["max"]}",
+                (string?)kv.Value?["reasoning"] ?? "",
+            }).ToList();
+            PrintTable("Rubric — per-dimension scores (sums to the overall score above)", new[] { "Dimension", "Score", "Reasoning" }, rows);
+        }
+
+        PrintTable("Rubric — verdict arithmetic", new[] { "Field", "Value" }, new List<string[]>
+        {
+            new[] { "Overall score", $"{(int?)judge["overall_score"]}" },
+            new[] { "Overall max", $"{(int?)judge["overall_max"]}" },
+            new[] { "Overall percentage", FormatPercentOrNa(judge["overall_percentage"]) },
+            new[] { "Pass threshold", FormatPercentOrNa(judge["pass_threshold_overall"]) },
+            new[] { "Verdict", (string?)judge["verdict"] ?? "-" },
+        });
+    }
+
+    /// <summary>
+    /// Drill-down for "EGHR": every atomic claim the judge extracted, its
+    /// citations, and its support label (with fabricated citations flagged —
+    /// those are forced to "unsupported" deterministically regardless of
+    /// what the LLM said, see AmlAgent.Evidence.EvidenceScoring.ScoreClaims).
+    /// </summary>
+    private static void PrintEghrTables(JsonObject judge)
+    {
+        var eghr = judge["eghr"]?.AsObject();
+        if (eghr is null) return;
+
+        var claims = judge["claims"]?.AsArray();
+        if (claims is not null && claims.Count > 0)
+        {
+            var rows = claims.Select((c, i) => new[]
+            {
+                $"{i + 1}",
+                Truncate((string?)c?["text"] ?? "", 70),
+                string.Join(", ", c?["cited_txn_ids"]?.AsArray()?.Select(n => (string?)n) ?? Array.Empty<string?>()),
+                (string?)c?["support"] ?? "-",
+                (bool?)c?["fabricated_citation"] == true ? "YES" : "",
+            }).ToList();
+            PrintTable("EGHR — claims (each one scored supported / unsupported / contradicted)",
+                new[] { "#", "Claim", "Cited txn IDs", "Support", "Fabricated?" }, rows);
+        }
+
+        PrintTable("EGHR — summary (why the rate is what it is)", new[] { "Field", "Value" }, new List<string[]>
+        {
+            new[] { "Total claims", $"{(int?)eghr["total_claims"]}" },
+            new[] { "Supported", $"{(int?)eghr["supported_count"]}" },
+            new[] { "Unsupported (extrinsic)", $"{(int?)eghr["unsupported_count"]}" },
+            new[] { "Contradicted (intrinsic)", $"{(int?)eghr["contradicted_count"]}" },
+            new[] { "Rate = (unsupported + contradicted) / total", FormatPercentOrNa(eghr["rate"]) },
+        });
+    }
+
+    /// <summary>
+    /// Drill-down for "Evidence traceability precision/recall": exactly
+    /// which transaction IDs the report cited, which of those were fabricated
+    /// (don't exist in the source data), and which of the curated gold-evidence
+    /// transactions were actually covered vs. missed.
+    /// </summary>
+    private static void PrintTraceabilityTables(JsonObject judge)
+    {
+        var trace = judge["evidence_traceability"]?.AsObject();
+        if (trace is null) return;
+
+        var grounded = StringsOf(trace["grounded_citations"]);
+        var fabricated = StringsOf(trace["fabricated_citations"]);
+        var citationRows = grounded.Select(id => new[] { id, "real (in source data)" })
+            .Concat(fabricated.Select(id => new[] { id, "FABRICATED — not in source data" }))
+            .ToList();
+        if (citationRows.Count > 0)
+            PrintTable("Evidence traceability — every cited transaction (why precision is what it is)",
+                new[] { "Cited txn ID", "Status" }, citationRows);
+        else
+            Console.WriteLine("\n-- Evidence traceability — report cited no transaction IDs at all --");
+
+        var gold = StringsOf(trace["gold_evidence_txn_ids"]);
+        var matched = new HashSet<string>(StringsOf(trace["matched_gold_citations_list"]), StringComparer.OrdinalIgnoreCase);
+        if (gold.Count > 0)
+        {
+            var goldRows = gold.Select(id => new[] { id, matched.Contains(id) ? "cited" : "MISSING — not cited" }).ToList();
+            PrintTable("Evidence traceability — gold-evidence coverage (why recall is what it is)",
+                new[] { "Gold-evidence txn ID", "Covered?" }, goldRows);
+        }
+
+        PrintTable("Evidence traceability — summary", new[] { "Field", "Value" }, new List<string[]>
+        {
+            new[] { "Cited txn IDs (total mentions)", $"{(int?)trace["cited_txn_ids_total"] ?? 0}" },
+            new[] { "Cited txn IDs (distinct)", $"{(int?)trace["cited_txn_ids_distinct"] ?? 0}" },
+            new[] { "Grounded (real) citations", $"{(int?)trace["grounded_citations_distinct"] ?? 0}" },
+            new[] { "Fabricated citations", $"{fabricated.Count}" },
+            new[] { "Gold-evidence set size", $"{(int?)trace["gold_evidence_total"] ?? 0}" },
+            new[] { "Matched gold citations", $"{(int?)trace["matched_gold_citations"] ?? 0}" },
+            new[] { "Precision = matched / grounded citations", FormatPercentOrNa(trace["precision"]) },
+            new[] { "Recall = matched / gold-evidence size", FormatPercentOrNa(trace["recall"]) },
+            new[] { "F1", FormatPercentOrNa(trace["f1"]) },
+        });
+    }
+
+    private static List<string> StringsOf(JsonNode? arrayNode) =>
+        arrayNode?.AsArray()?.Select(n => (string?)n ?? "").ToList() ?? new List<string>();
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..(max - 3)] + "...";
 
     private static string FormatPercentOrNa(JsonNode? node)
     {

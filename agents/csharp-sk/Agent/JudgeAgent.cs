@@ -225,10 +225,14 @@ internal static class JudgeAgent
             ["method"] = "deterministic_regex_citation_match",
             ["cited_txn_ids_total"] = traceability.CitedTotal,
             ["cited_txn_ids_distinct"] = traceability.CitedDistinct,
-            ["fabricated_citations"] = new JsonArray(traceability.FabricatedCitations.Select(s => (JsonNode)s).ToArray()),
+            ["fabricated_citations"] = ToJsonArray(traceability.FabricatedCitations),
             ["grounded_citations_distinct"] = traceability.GroundedDistinct,
+            ["grounded_citations"] = ToJsonArray(traceability.GroundedCitations),
             ["gold_evidence_total"] = traceability.GoldTotal,
+            ["gold_evidence_txn_ids"] = ToJsonArray(traceability.GoldEvidenceTxnIds),
             ["matched_gold_citations"] = traceability.MatchedGoldCitations,
+            ["matched_gold_citations_list"] = ToJsonArray(traceability.MatchedGoldCitationsList),
+            ["missing_gold_citations_list"] = ToJsonArray(traceability.MissingGoldCitationsList),
             ["precision"] = traceability.Precision,
             ["recall"] = traceability.Recall,
             ["f1"] = traceability.F1,
@@ -344,6 +348,9 @@ internal static class JudgeAgent
         }
         return result;
     }
+
+    private static JsonArray ToJsonArray(IReadOnlyList<string> values) =>
+        new JsonArray(values.Select(s => (JsonNode)s).ToArray());
 
     private static JsonArray ClaimsToJson(IReadOnlyList<ClaimResult> claims)
     {

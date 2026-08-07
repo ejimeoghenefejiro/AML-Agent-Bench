@@ -64,13 +64,23 @@ public static class EvidenceScoring
         var grounded = new HashSet<string>(
             citedDistinct.Where(id => validTxnIds.Contains(id)),
             StringComparer.OrdinalIgnoreCase);
+        var groundedList = grounded.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
 
         int matched = 0;
         double? precision = null, recall = null, f1 = null;
+        var matchedList = new List<string>();
+        var missingList = new List<string>();
+        var goldList = goldTxnIds is null
+            ? new List<string>()
+            : goldTxnIds.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
 
         if (goldTxnIds is not null)
         {
-            matched = grounded.Count(id => goldTxnIds.Contains(id));
+            matchedList = grounded.Where(id => goldTxnIds.Contains(id))
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
+            missingList = goldTxnIds.Where(id => !grounded.Contains(id))
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
+            matched = matchedList.Count;
             precision = grounded.Count == 0 ? null : Math.Round((double)matched / grounded.Count, 4);
             recall = goldTxnIds.Count == 0 ? null : Math.Round((double)matched / goldTxnIds.Count, 4);
             if (precision is double p && recall is double r && (p + r) > 0)
@@ -82,8 +92,12 @@ public static class EvidenceScoring
             CitedDistinct: citedDistinct.Count,
             FabricatedCitations: fabricated,
             GroundedDistinct: grounded.Count,
+            GroundedCitations: groundedList,
             GoldTotal: goldTxnIds?.Count,
+            GoldEvidenceTxnIds: goldList,
             MatchedGoldCitations: matched,
+            MatchedGoldCitationsList: matchedList,
+            MissingGoldCitationsList: missingList,
             Precision: precision,
             Recall: recall,
             F1: f1);
@@ -150,8 +164,12 @@ public sealed record TraceabilityResult(
     int CitedDistinct,
     IReadOnlyList<string> FabricatedCitations,
     int GroundedDistinct,
+    IReadOnlyList<string> GroundedCitations,
     int? GoldTotal,
+    IReadOnlyList<string> GoldEvidenceTxnIds,
     int MatchedGoldCitations,
+    IReadOnlyList<string> MatchedGoldCitationsList,
+    IReadOnlyList<string> MissingGoldCitationsList,
     double? Precision,
     double? Recall,
     double? F1);
