@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AmlAgent.Oracle\AmlAgent.Oracle.csproj" />
+    <ProjectReference Include="..\..\src\AmlAgent.Evidence\AmlAgent.Evidence.csproj" />
   </ItemGroup>
 
 </Project>

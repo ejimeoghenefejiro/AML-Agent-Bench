@@ -92,6 +92,7 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 | **AmlAgent.Harness** | The runner: builds everything, runs the agent, scores it, writes results. | The **invigilator** — runs the exam and marks the candidate. |
 | **AmlAgent.Oracle** | A hand-written correct answer used to sanity-check the bench. | The **marking scheme** — the known-correct answers, used to prove the bench itself works. |
 | **AmlAgent.Tests** | Rule-based tests (xUnit) that check the agent's output is correct. | The **rubric** — the deterministic rules every answer must satisfy. |
+| **AmlAgent.Evidence** | Pure, dependency-free scoring logic for the two primary proposal metrics (EGHR, citation precision/recall). No LLM, network or file I/O. | The **statistician** — turns raw claims and citations into the actual hallucination and traceability numbers, with no opinion of its own. |
 
 **Put together:** the **Harness** (invigilator) gives the **Agent** (candidate) the AML task, then marks its output using the **Tests** (rubric) and the **Agent-as-judge** (reviewer). The **Oracle** (marking scheme) is the gold-standard answer used to prove the marking process itself is sound.
 
@@ -102,7 +103,8 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 | **Reference agent** | `agents/csharp-sk/` — .NET 8 + Microsoft Semantic Kernel | The primary subject of the PhD investigation; tool-calling agent with `run`, `chat`, and `judge` subcommands |
 | **Reference oracle** | `src/AmlAgent.Oracle/` | Pure-C# canonical solution for Task 001; produces ground-truth output without spending LLM tokens |
 | **Harness** | `src/AmlAgent.Harness/` | Benchmark runner; supports `--local` (no Docker) and Docker modes; writes consolidated `bench_result.json` per run |
-| **LLM-as-judge** | `agents/csharp-sk/Agent/JudgeAgent.cs` | The same SK core grades qualitative regulatory properties against a `rubric.json` |
+| **LLM-as-judge** | `agents/csharp-sk/Agent/JudgeAgent.cs` | The same SK core grades qualitative regulatory properties against a `rubric.json`, and computes EGHR + evidence traceability |
+| **Evidence scoring** | `src/AmlAgent.Evidence/` | Pure, unit-tested logic for EGHR and citation precision/recall — the proposal's two primary metrics |
 | **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort / citation assertions across two tasks and the judge report |
 | **Tasks** | `tasks/<task-id>/` | Self-contained task definitions: brief + data + expected behaviour + tests + rubric |
 | **Submissions** | `submissions/` (mostly gitignored) | Drop point for external agents; ships with one reference Python baseline |
@@ -423,7 +425,7 @@ Tests are gated on workspace shape: e.g. Task 001 tests skip if `data/transfers.
 
 `aml-agent judge` loads a task's `rubric.json`, the agent's output file(s), and the underlying ground-truth data (so the judge can verify citations). It sends them to gpt-4o-mini through Semantic Kernel with `FunctionChoiceBehavior.None` and `ResponseFormat=json_object`, asking for structured scoring per dimension.
 
-This rubric (`evidence_citation`, `avoids_unsupported_claims`, etc.) is today's **prototype proxy** for the PhD proposal's two primary metrics — Evidence-Grounded Hallucination Rate and citation precision/recall — not yet those metrics themselves. See [docs/dimension-mapping.md](docs/dimension-mapping.md) for the precise gap.
+On top of the six-dimension rubric score, the judge also computes the PhD proposal's two **primary metrics directly**: Evidence-Grounded Hallucination Rate (EGHR) and evidence-traceability citation precision/recall — see §8.3 below. See [docs/dimension-mapping.md](docs/dimension-mapping.md) for exactly what's implemented vs. still planned across all six dimensions.
 
 Example `judge_report.json` (real run, Task 006):
 
@@ -445,6 +447,29 @@ Example `judge_report.json` (real run, Task 006):
 ```
 
 The overall percentage and verdict are **recomputed defensively in C#** from the per-dimension scores — the LLM cannot game the arithmetic.
+
+### 8.3 The two primary proposal metrics: EGHR and evidence traceability
+
+Alongside the six rubric dimensions, `judge_report.json` now also carries the proposal's headline primary metrics, computed by `src/AmlAgent.Evidence/EvidenceScoring.cs`:
+
+- **`eghr`** — Evidence-Grounded Hallucination Rate. The judge extracts atomic claims from the candidate's report and labels each `supported` / `unsupported` / `contradicted`. Any claim citing a transaction ID that doesn't exist in the source data is **deterministically forced to `unsupported`**, regardless of what the LLM said — the judge cannot inflate its own grounding. `rate = (unsupported + contradicted) / total_claims`.
+- **`evidence_traceability`** — citation precision/recall/F1. Computed **entirely deterministically** (regex citation extraction + set arithmetic, no LLM call), against a curated gold-evidence set per task (`tasks/<id>/evidence-annotations.json`).
+
+Example from a real `gpt-4o-mini` run on Task 006 (2026-08-07) — note this run's six-dimension rubric scored `evidence_citation: 3/5` and passed overall at 80%, while the deterministic traceability metric shows the report actually cited only 1 of the 13 gold-evidence transactions:
+
+```json
+"eghr": {
+  "total_claims": 5, "supported_count": 3, "unsupported_count": 2,
+  "contradicted_count": 0, "rate": 0.4
+},
+"evidence_traceability": {
+  "cited_txn_ids_distinct": 3, "fabricated_citations": [],
+  "gold_evidence_total": 13, "matched_gold_citations": 1,
+  "precision": 0.3333, "recall": 0.0769, "f1": 0.125
+}
+```
+
+This is the kind of gap the rubric score alone hides: a report can look compliant (cautious tone, some real citations, no accusations) while still being weakly grounded against the specific evidence that matters. See [docs/dimension-mapping.md](docs/dimension-mapping.md) for scope and limitations (currently task-006 only; gold set is hand-curated, not yet multi-annotator).
 
 ---
 
@@ -515,6 +540,8 @@ AML-Agent-Bench/
 │   │   ├── AmlGraph.cs           # union-find WCC + iterative Tarjan SCC
 │   │   ├── OracleRunner.cs       # canonical clustering pipeline
 │   │   └── Program.cs            # `aml-oracle --input ... --output ...`
+│   ├── AmlAgent.Evidence/        # pure EGHR + citation-traceability scoring logic
+│   │   └── EvidenceScoring.cs    # no LLM, network or file I/O — unit-testable in isolation
 │   └── AmlAgent.Harness/         # benchmark runner (local + Docker)
 │       ├── Program.cs            # `aml-harness --agent / --agent-image / --submission / --local`
 │       ├── ReportBuilder.cs      # writes consolidated bench_result.json + results/ archive
@@ -524,7 +551,8 @@ AML-Agent-Bench/
 │       ├── OracleSmokeTests.cs       # in-process Oracle tests
 │       ├── OutputContractTests.cs    # Task 001 schema / range / sort tests
 │       ├── Task006SummaryTests.cs    # Task 006 CSV + markdown tests
-│       └── JudgeReportTests.cs       # judge_report.json shape + verdict
+│       ├── JudgeReportTests.cs       # judge_report.json shape + verdict + EGHR/traceability consistency
+│       └── EvidenceScoringTests.cs   # always-on unit tests for EGHR/traceability logic (no workspace/LLM needed)
 ├── tasks/
 │   ├── aml-transaction-network/
 │   │   ├── instruction.md
@@ -536,7 +564,8 @@ AML-Agent-Bench/
 │       ├── instruction.md             # alias pointer
 │       ├── expected-behaviour.md      # what a good response looks like
 │       ├── tests.md                   # description of the test plan
-│       ├── rubric.json                # SK-as-judge scoring criteria
+│       ├── rubric.json                # SK-as-judge scoring criteria + gold_evidence_annotations pointer
+│       ├── evidence-annotations.json  # gold-evidence txn IDs for EGHR / traceability scoring
 │       ├── task.toml
 │       └── environment/data/weekly_transfers.csv
 ├── submissions/                       # drop external agents here (gitignored)

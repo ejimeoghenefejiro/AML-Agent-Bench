@@ -3,6 +3,7 @@
   "pass_threshold_overall": 0.7,
   "evaluation_inputs": ["temporal_anomaly_report.md"],
   "grounding_inputs": ["data/weekly_transfers.csv"],
+  "gold_evidence_annotations": "evidence-annotations.json",
   "dimensions": [
     {
       "id": "evidence_citation",

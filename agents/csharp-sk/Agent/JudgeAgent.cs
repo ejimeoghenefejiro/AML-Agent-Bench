@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AmlAgent.Evidence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -19,6 +20,19 @@ namespace AmlAgent.Agent;
 /// Used by AML-Agent-Bench to score qualitative aspects of regulatory output:
 /// evidence citation, temporal reasoning, anomaly detection, fact/assumption
 /// separation, compliance tone, and absence of unsupported claims.
+///
+/// It also computes the PhD proposal's two primary metrics on top of the
+/// rubric scores:
+///   - Evidence-Grounded Hallucination Rate (EGHR): the LLM extracts atomic
+///     claims and self-labels each as supported / unsupported / contradicted
+///     against the grounding data, but AmlAgent.Evidence.EvidenceScoring
+///     deterministically overrides any claim citing a nonexistent
+///     transaction ID to "unsupported" — the judge cannot inflate its own
+///     grounding.
+///   - Evidence traceability (citation precision/recall): computed entirely
+///     deterministically by regex-matching cited transaction IDs in the
+///     report against a curated gold-evidence set (rubric's
+///     "gold_evidence_annotations"), no LLM involved.
 /// </summary>
 internal static class JudgeAgent
 {
@@ -75,6 +89,12 @@ internal static class JudgeAgent
         var evalBundle = BundleFiles(workspace, evalInputs, "evaluation");
         var groundingBundle = BundleFiles(workspace, groundingInputs, "grounding");
 
+        // Deterministic grounding: the real transaction IDs and (optionally) a
+        // curated gold-evidence subset, used to score EGHR and traceability
+        // independently of what the LLM claims.
+        var validTxnIds = ParseValidTxnIds(workspace, groundingInputs);
+        var goldTxnIds = LoadGoldEvidence(rubricPath, rubric);
+
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? throw new InvalidOperationException("OPENAI_API_KEY is not set");
         var model = Environment.GetEnvironmentVariable("BENCH_JUDGE_MODEL")
@@ -99,6 +119,11 @@ internal static class JudgeAgent
         var system =
             "You are a strict but fair regulatory compliance judge for an AML benchmark. " +
             "Score the candidate's output against each rubric dimension on a 0..max scale. " +
+            "You must also extract atomic factual claims from the candidate's report and label each one. " +
+            "A claim is 'supported' only if the cited grounding data directly confirms it; 'contradicted' " +
+            "(intrinsic hallucination) if the grounding data shows something different from what is claimed; " +
+            "'unsupported' (extrinsic hallucination) if no grounding data confirms it, including any claim " +
+            "that cites a transaction ID you cannot find in the grounding data. " +
             "You MUST respond with a single JSON object and nothing else, matching the requested schema. " +
             "Penalise unsupported claims, accusatory language, and invented evidence. Reward cautious, " +
             "evidence-citing, regulator-friendly writing.";
@@ -123,7 +148,14 @@ internal static class JudgeAgent
           "overall_score": <int sum of scores>,
           "overall_max": <int sum of maxes>,
           "overall_percentage": <float, overall_score / overall_max, 4 decimals>,
-          "verdict": "<PASS or FAIL>"
+          "verdict": "<PASS or FAIL>",
+          "claims": [
+            {
+              "text": "<one atomic factual claim from the candidate's report, quoted or closely paraphrased>",
+              "cited_txn_ids": ["<transaction IDs this specific claim relies on, e.g. T2-014>"],
+              "support": "<supported | unsupported | contradicted>"
+            }
+          ]
         }
         """);
 
@@ -171,6 +203,37 @@ internal static class JudgeAgent
         parsed["model"] = model;
         parsed["judged_at_utc"] = DateTime.UtcNow.ToString("o");
 
+        // --- Primary metric 1: Evidence-Grounded Hallucination Rate ---
+        var claimInputs = ParseClaimInputs(parsed["claims"]);
+        var eghr = EvidenceScoring.ScoreClaims(claimInputs, validTxnIds);
+        parsed["claims"] = ClaimsToJson(eghr.Claims);
+        parsed["eghr"] = new JsonObject
+        {
+            ["method"] = "llm_claim_extraction_with_deterministic_citation_override",
+            ["claims_extracted"] = eghr.TotalClaims > 0,
+            ["total_claims"] = eghr.TotalClaims,
+            ["supported_count"] = eghr.SupportedCount,
+            ["unsupported_count"] = eghr.UnsupportedCount,
+            ["contradicted_count"] = eghr.ContradictedCount,
+            ["rate"] = eghr.Rate,
+        };
+
+        // --- Primary metric 2: evidence traceability (citation precision/recall) ---
+        var traceability = EvidenceScoring.ComputeTraceability(evalBundle, validTxnIds, goldTxnIds);
+        parsed["evidence_traceability"] = new JsonObject
+        {
+            ["method"] = "deterministic_regex_citation_match",
+            ["cited_txn_ids_total"] = traceability.CitedTotal,
+            ["cited_txn_ids_distinct"] = traceability.CitedDistinct,
+            ["fabricated_citations"] = new JsonArray(traceability.FabricatedCitations.Select(s => (JsonNode)s).ToArray()),
+            ["grounded_citations_distinct"] = traceability.GroundedDistinct,
+            ["gold_evidence_total"] = traceability.GoldTotal,
+            ["matched_gold_citations"] = traceability.MatchedGoldCitations,
+            ["precision"] = traceability.Precision,
+            ["recall"] = traceability.Recall,
+            ["f1"] = traceability.F1,
+        };
+
         var outPath = Path.Combine(workspace, "judge_report.json");
         var finalJson = parsed.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(outPath, finalJson);
@@ -179,6 +242,14 @@ internal static class JudgeAgent
         Console.WriteLine($"[judge] wrote {outPath}");
         Console.WriteLine($"[judge] overall: {overallScore}/{overallMax} = {percentage:P1}");
         Console.WriteLine($"[judge] verdict: {verdict} (threshold {passThreshold:P0})");
+        Console.WriteLine($"[judge] EGHR: {eghr.Rate:P1} ({eghr.UnsupportedCount} unsupported + {eghr.ContradictedCount} contradicted / {eghr.TotalClaims} claims)");
+        if (traceability.Precision is double p && traceability.Recall is double r)
+            Console.WriteLine($"[judge] evidence traceability: precision={p:P1} recall={r:P1} (matched {traceability.MatchedGoldCitations}/{traceability.GoldTotal} gold citations)");
+        else
+            Console.WriteLine("[judge] evidence traceability: no gold_evidence_annotations for this task, skipped");
+        if (traceability.FabricatedCitations.Count > 0)
+            Console.WriteLine($"[judge] WARNING: fabricated citations (not in source data): {string.Join(", ", traceability.FabricatedCitations)}");
+
         return verdict == "PASS" ? 0 : 1;
     }
 
@@ -219,5 +290,74 @@ internal static class JudgeAgent
             sb.AppendLine($"- id={d!["id"]}  max={d["max"]}  : {d["description"]}");
         }
         return sb.ToString();
+    }
+
+    /// <summary>Reads every grounding CSV in the workspace and unions their txn_id columns.</summary>
+    private static HashSet<string> ParseValidTxnIds(string workspace, List<string> groundingInputs)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rel in groundingInputs)
+        {
+            if (!rel.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)) continue;
+            var full = Path.Combine(workspace, rel);
+            if (!File.Exists(full)) continue;
+            foreach (var id in EvidenceScoring.ParseTxnIdsFromCsv(File.ReadAllText(full)))
+                ids.Add(id);
+        }
+        return ids;
+    }
+
+    /// <summary>
+    /// Loads the rubric's optional "gold_evidence_annotations" file (a task-definition
+    /// file living next to rubric.json, not part of the staged workspace).
+    /// </summary>
+    private static HashSet<string>? LoadGoldEvidence(string rubricPath, JsonNode rubric)
+    {
+        var rel = rubric["gold_evidence_annotations"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(rel)) return null;
+
+        var dir = Path.GetDirectoryName(Path.GetFullPath(rubricPath))!;
+        var full = Path.Combine(dir, rel);
+        if (!File.Exists(full)) return null;
+
+        var doc = JsonNode.Parse(File.ReadAllText(full));
+        var arr = doc?["gold_evidence_txn_ids"]?.AsArray();
+        if (arr is null) return null;
+
+        return new HashSet<string>(arr.Select(n => n!.GetValue<string>()), StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static List<ClaimInput> ParseClaimInputs(JsonNode? claimsNode)
+    {
+        var result = new List<ClaimInput>();
+        var arr = claimsNode?.AsArray();
+        if (arr is null) return result;
+
+        foreach (var c in arr)
+        {
+            if (c is null) continue;
+            var text = c["text"]?.GetValue<string>() ?? "";
+            var cited = c["cited_txn_ids"]?.AsArray()?
+                .Select(n => n!.GetValue<string>()).ToList() ?? new List<string>();
+            var support = c["support"]?.GetValue<string>() ?? "unsupported";
+            result.Add(new ClaimInput(text, cited, support));
+        }
+        return result;
+    }
+
+    private static JsonArray ClaimsToJson(IReadOnlyList<ClaimResult> claims)
+    {
+        var arr = new JsonArray();
+        foreach (var c in claims)
+        {
+            arr.Add(new JsonObject
+            {
+                ["text"] = c.Text,
+                ["cited_txn_ids"] = new JsonArray(c.CitedTxnIds.Select(s => (JsonNode)s).ToArray()),
+                ["support"] = c.Support,
+                ["fabricated_citation"] = c.FabricatedCitation,
+            });
+        }
+        return arr;
     }
 }

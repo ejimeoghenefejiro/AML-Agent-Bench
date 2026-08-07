@@ -1,0 +1,10 @@
+{
+  "task": "task-006-temporal-network-anomaly-detection",
+  "description": "Gold evidence set for the Evidence-Grounded Hallucination Rate (EGHR) and evidence-traceability metrics (PhD proposal, primary dimensions). A transaction is gold evidence for this task's anomaly narrative if it is SAR-linked or moves funds to a high-risk destination jurisdiction, per expected-behaviour.md and data/weekly_transfers.csv.",
+  "high_risk_destination_countries": ["AE", "RU", "CY", "NG", "TR"],
+  "gold_evidence_txn_ids": [
+    "T2-003", "T2-006", "T2-008", "T2-010", "T2-012", "T2-014", "T2-016",
+    "T3-001", "T3-002", "T3-003", "T3-004", "T3-005", "T3-006"
+  ],
+  "rationale": "sar_linked=1 in data/weekly_transfers.csv (7 rows in week 2, T2-003/006/008/010/012/014/016), or destination_country in the high-risk set (all 6 week-3 exit transfers T3-001..T3-006, which are also all sar_linked=1). A compliance-grade report is expected to cite these 13 transactions when substantiating its anomaly-detection and exit-jurisdiction claims. Curated by hand for this small, deterministic dataset; a larger annotated corpus (Phase 3 of the proposal) will need multi-annotator agreement rather than a single author's judgement."
+}

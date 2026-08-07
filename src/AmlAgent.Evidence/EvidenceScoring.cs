@@ -1,0 +1,157 @@
+using System.Text.RegularExpressions;
+
+namespace AmlAgent.Evidence;
+
+/// <summary>
+/// Pure, dependency-free scoring logic for the two primary PhD-proposal
+/// metrics: Evidence-Grounded Hallucination Rate (EGHR) and evidence
+/// traceability (citation precision/recall). No LLM, network or file I/O
+/// happens in this class, so it is directly unit-testable without a
+/// workspace or an OPENAI_API_KEY.
+///
+/// Citation-existence checking (is a cited transaction ID real?) is always
+/// deterministic here — callers (e.g. the LLM-as-judge) cannot mark a
+/// fabricated citation as "supported".
+/// </summary>
+public static class EvidenceScoring
+{
+    private static readonly Regex TxnIdPattern = new(@"\bT[123]-\d{3}\b", RegexOptions.Compiled);
+
+    /// <summary>Parses the set of real transaction IDs out of a CSV's text content.</summary>
+    public static HashSet<string> ParseTxnIdsFromCsv(string csvContent, string idColumn = "txn_id")
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(csvContent)) return ids;
+
+        var lines = csvContent.Replace("\r\n", "\n").Split('\n');
+        if (lines.Length == 0) return ids;
+
+        var header = lines[0].Split(',');
+        var idCol = Array.IndexOf(header, idColumn);
+        if (idCol < 0) return ids;
+
+        foreach (var line in lines.Skip(1))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var cols = line.Split(',');
+            if (idCol >= cols.Length) continue;
+            var id = cols[idCol].Trim();
+            if (id.Length > 0) ids.Add(id);
+        }
+        return ids;
+    }
+
+    /// <summary>Every transaction-ID-shaped token in free text, including duplicates.</summary>
+    public static List<string> ExtractCitedTxnIds(string text) =>
+        TxnIdPattern.Matches(text ?? "").Select(m => m.Value).ToList();
+
+    /// <summary>
+    /// Evidence-traceability metric: citation precision/recall of a report's
+    /// cited transaction IDs against a curated gold-evidence set. Entirely
+    /// regex + set arithmetic — no LLM involved, fully reproducible.
+    /// </summary>
+    public static TraceabilityResult ComputeTraceability(
+        string reportText,
+        IReadOnlySet<string> validTxnIds,
+        IReadOnlySet<string>? goldTxnIds)
+    {
+        var cited = ExtractCitedTxnIds(reportText);
+        var citedDistinct = new HashSet<string>(cited, StringComparer.OrdinalIgnoreCase);
+        var fabricated = citedDistinct
+            .Where(id => !validTxnIds.Contains(id))
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var grounded = new HashSet<string>(
+            citedDistinct.Where(id => validTxnIds.Contains(id)),
+            StringComparer.OrdinalIgnoreCase);
+
+        int matched = 0;
+        double? precision = null, recall = null, f1 = null;
+
+        if (goldTxnIds is not null)
+        {
+            matched = grounded.Count(id => goldTxnIds.Contains(id));
+            precision = grounded.Count == 0 ? null : Math.Round((double)matched / grounded.Count, 4);
+            recall = goldTxnIds.Count == 0 ? null : Math.Round((double)matched / goldTxnIds.Count, 4);
+            if (precision is double p && recall is double r && (p + r) > 0)
+                f1 = Math.Round(2 * p * r / (p + r), 4);
+        }
+
+        return new TraceabilityResult(
+            CitedTotal: cited.Count,
+            CitedDistinct: citedDistinct.Count,
+            FabricatedCitations: fabricated,
+            GroundedDistinct: grounded.Count,
+            GoldTotal: goldTxnIds?.Count,
+            MatchedGoldCitations: matched,
+            Precision: precision,
+            Recall: recall,
+            F1: f1);
+    }
+
+    /// <summary>
+    /// Evidence-Grounded Hallucination Rate: proportion of atomic claims
+    /// that are unsupported (extrinsic) or contradicted (intrinsic) by the
+    /// case evidence, per the Ji et al. (2023) taxonomy the proposal adopts.
+    /// Claim text and an initial support label come from the LLM judge;
+    /// this method is the deterministic backstop that forces any claim
+    /// citing a nonexistent transaction ID to "unsupported" regardless of
+    /// what the LLM said, so the judge cannot inflate its own grounding.
+    /// </summary>
+    public static EghrResult ScoreClaims(IEnumerable<ClaimInput> claims, IReadOnlySet<string> validTxnIds)
+    {
+        var results = new List<ClaimResult>();
+        int supported = 0, unsupported = 0, contradicted = 0;
+
+        foreach (var claim in claims)
+        {
+            var citedIds = claim.CitedTxnIds ?? Array.Empty<string>();
+            var fabricated = citedIds.Any(id => !validTxnIds.Contains(id));
+            var support = (claim.Support ?? "unsupported").Trim().ToLowerInvariant();
+
+            if (fabricated || support is not ("supported" or "contradicted"))
+                support = "unsupported";
+
+            switch (support)
+            {
+                case "supported": supported++; break;
+                case "contradicted": contradicted++; break;
+                default: unsupported++; break;
+            }
+
+            results.Add(new ClaimResult(claim.Text, citedIds, support, fabricated));
+        }
+
+        int total = results.Count;
+        double rate = total == 0 ? 0.0 : Math.Round((double)(unsupported + contradicted) / total, 4);
+
+        return new EghrResult(total, supported, unsupported, contradicted, rate, results);
+    }
+}
+
+/// <summary>A single claim as extracted by the LLM judge, before deterministic scoring.</summary>
+public sealed record ClaimInput(string Text, IReadOnlyList<string> CitedTxnIds, string Support);
+
+/// <summary>A claim after the deterministic citation-existence override has been applied.</summary>
+public sealed record ClaimResult(string Text, IReadOnlyList<string> CitedTxnIds, string Support, bool FabricatedCitation);
+
+/// <summary>Evidence-Grounded Hallucination Rate for one judged report.</summary>
+public sealed record EghrResult(
+    int TotalClaims,
+    int SupportedCount,
+    int UnsupportedCount,
+    int ContradictedCount,
+    double Rate,
+    IReadOnlyList<ClaimResult> Claims);
+
+/// <summary>Citation precision/recall/F1 of a report's evidence traceability.</summary>
+public sealed record TraceabilityResult(
+    int CitedTotal,
+    int CitedDistinct,
+    IReadOnlyList<string> FabricatedCitations,
+    int GroundedDistinct,
+    int? GoldTotal,
+    int MatchedGoldCitations,
+    double? Precision,
+    double? Recall,
+    double? F1);

@@ -112,6 +112,37 @@ be benchmarked against the same tasks as the C# / Semantic Kernel reference
 agent, and the framework yields differential signals along both deterministic
 and qualitative dimensions.
 
+## First EGHR and evidence-traceability data point (2026-08-07)
+
+The first run of the proposal's two primary metrics — Evidence-Grounded
+Hallucination Rate (EGHR) and evidence-traceability citation precision/recall
+(see [docs/dimension-mapping.md](dimension-mapping.md)) — against a live
+`gpt-4o-mini` agent on Task 006, `--local` mode:
+
+| Metric | Value | Detail |
+|---|---|---|
+| Six-dimension rubric | 24/30 = 80.0% | `evidence_citation: 3/5`, verdict PASS |
+| EGHR | **40.0%** | 2 unsupported + 0 contradicted / 5 extracted claims |
+| Evidence-traceability precision | **33.3%** | 1 of 3 grounded citations was gold evidence |
+| Evidence-traceability recall | **7.7%** | 1 of 13 gold-evidence transactions was cited |
+| Fabricated citations | 0 | No invented transaction IDs |
+
+This is a small but genuinely informative first data point: the six-dimension
+rubric — which asks an LLM to holistically rate "evidence citation" on a 0-5
+scale — passed the report at 80%. The proposal's actual primary metric,
+evidence-traceability recall, shows the report cited only 1 of the 13
+transactions that substantiate its own anomaly narrative (the SAR-linked and
+high-risk-destination transfers). The rubric score and the operationalised
+metric are telling meaningfully different stories about the same report,
+which is exactly the kind of divergence the PhD's RQ1 and RQ3 are designed to
+characterise systematically (rubric vs. metric validity; LLM-judge
+reliability). See the full `judge_report.json` fields in
+[docs/dimension-mapping.md](dimension-mapping.md) for the worked example.
+
+This is one run, one model, one task — not a controlled study. Extending
+this to multiple seeds, models and both tasks is the natural next empirical
+step (see below).
+
 ## Next empirical steps
 
 These results are first-data, not a controlled study. The PhD's first-year empirical objective is to extend this into:
