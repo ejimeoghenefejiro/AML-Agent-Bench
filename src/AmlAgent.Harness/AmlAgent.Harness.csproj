@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AmlAgent.Oracle\AmlAgent.Oracle.csproj" />
+    <ProjectReference Include="..\AmlAgent.Evidence\AmlAgent.Evidence.csproj" />
   </ItemGroup>
 
 </Project>

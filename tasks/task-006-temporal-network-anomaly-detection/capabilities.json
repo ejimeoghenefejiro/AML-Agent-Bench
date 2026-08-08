@@ -1,0 +1,9 @@
+{
+  "description": "Operational capabilities this task actually exercises, per the CLI-Only Assurance Roadmap's capability-tagging concept. Not every capability in the roadmap's illustrative list applies to every task; this file declares only the ones this specific task tests.",
+  "operational_capabilities": [
+    "temporal_transaction_analysis",
+    "anomaly_detection",
+    "evidence_based_case_reasoning",
+    "high_risk_destination_detection"
+  ]
+}

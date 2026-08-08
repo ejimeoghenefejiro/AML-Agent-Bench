@@ -27,6 +27,15 @@ public static class Program
 {
     public static int Main(string[] args)
     {
+        // Subcommands (CLI-Only Assurance Roadmap items 9/10) operate on
+        // already-produced assurance_profile.json files and don't need
+        // .env / OPENAI_API_KEY at all, so they're dispatched before the
+        // normal run flow's setup.
+        if (args.Length > 0 && args[0] == "compare")
+            return CompareCommand.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "regress")
+            return RegressCommand.Run(args.Skip(1).ToArray());
+
         var envFile = DotEnv.Load();
         if (envFile is not null)
             Console.WriteLine($"[env] loaded {envFile}");
@@ -41,6 +50,7 @@ public static class Program
         bool useOracle = false;
         bool skipJudge = false;
         bool useLocal = false;
+        string? policyPath = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -52,6 +62,7 @@ public static class Program
                 case "--task"         when i + 1 < args.Length: task = args[++i]; break;
                 case "--model"        when i + 1 < args.Length: model = args[++i]; break;
                 case "--max-steps"    when i + 1 < args.Length: maxSteps = int.Parse(args[++i]); break;
+                case "--policy"       when i + 1 < args.Length: policyPath = args[++i]; break;
                 case "--keep-workspace": keepWorkspace = true; break;
                 case "--oracle":         useOracle = true; break;
                 case "--no-judge":       skipJudge = true; break;
@@ -173,6 +184,25 @@ public static class Program
             var report = ReportBuilder.Build(workspace, repoRoot, meta, outcomes, trxPath);
             PrintSummaryTables(report);
 
+            try
+            {
+                var assuranceProfile = AssuranceProfileBuilder.Build(report, workspace, repoRoot, policyPath);
+                if (assuranceProfile is not null)
+                {
+                    AssuranceProfileBuilder.Write(assuranceProfile, workspace, repoRoot, task, meta.AgentName, startedUtc);
+                    PrintAssuranceProfileTables(assuranceProfile);
+                }
+            }
+            catch (Exception ex)
+            {
+                // A bad policy (malformed JSON, unknown direction, impossible
+                // threshold) must not silently produce a decision, but it
+                // also must not take down an otherwise-successful benchmark
+                // run -- the agent/judge/xUnit results above are still valid
+                // and already written.
+                Console.Error.WriteLine($"[harness] assurance profile rejected: {ex.Message}");
+            }
+
             var overall = (testRc == 0 && judgeRc == 0) ? 0 : 1;
             return overall;
         }
@@ -188,7 +218,9 @@ public static class Program
         Console.WriteLine("aml-harness — Docker-based benchmark runner");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  aml-harness [agent-source] [--task <id>] [options]");
+        Console.WriteLine("  aml-harness [agent-source] [--task <id>] [options]     run a benchmark + assurance profile");
+        Console.WriteLine("  aml-harness compare <profile.json> <profile.json>...   compare two or more assurance profiles");
+        Console.WriteLine("  aml-harness regress --baseline <p.json> --candidate <p.json>   detect an assurance regression");
         Console.WriteLine();
         Console.WriteLine("Agent source (pick one):");
         Console.WriteLine("  --agent <name>           subfolder of agents/ in this repo (default: csharp-sk)");
@@ -200,6 +232,8 @@ public static class Program
         Console.WriteLine("                           accepts a unique prefix, e.g. --task task-006 or --task 006");
         Console.WriteLine("  --model <id>             override BENCH_MODEL for the agent container");
         Console.WriteLine("  --max-steps <n>          cap on agent turns (default: 25)");
+        Console.WriteLine("  --policy <path>          assurance policy to evaluate against (default: assurance/policy.default.json)");
+        Console.WriteLine("                           e.g. --policy assurance/policies/bank-strict.json");
         Console.WriteLine("  --keep-workspace         keep the temp workspace dir after exit");
         Console.WriteLine("  --oracle                 use AmlAgent.Oracle instead of running an agent container");
         Console.WriteLine("                           (only valid for task=aml-transaction-network)");
@@ -681,6 +715,113 @@ public static class Program
         });
     }
 
+    /// <summary>
+    /// Prints the assurance-profile decision as its own clearly separated
+    /// section: which of the policy's metrics passed/failed/were not
+    /// evaluated, which whole dimensions this benchmark doesn't measure yet
+    /// (never silently hidden), and the resulting deployment decision. See
+    /// assurance/README.md for what this is and, more importantly, what it
+    /// deliberately does not claim.
+    /// </summary>
+    private static void PrintAssuranceProfileTables(JsonObject profile)
+    {
+        PrintSectionBanner("ASSURANCE PROFILE (prototype) — see assurance/README.md before citing this anywhere");
+
+        // Three separate concepts, printed side by side on purpose: a
+        // benchmark PASS (xUnit + judge) must never be read as a deployment
+        // PASS. They're allowed to disagree, and often do.
+        var status = profile["status_summary"]?.AsObject();
+        PrintTable("Status (execution vs. benchmark vs. assurance are separate)", new[] { "Field", "Value" }, new List<string[]>
+        {
+            new[] { "Execution status", (string?)status?["execution_status"] ?? "-" },
+            new[] { "Benchmark verdict (xUnit + judge)", (string?)status?["benchmark_verdict"] ?? "-" },
+            new[] { "Assurance decision (this policy)", (string?)status?["assurance_decision"] ?? "-" },
+        });
+
+        var policy = profile["policy"]?.AsObject();
+        Console.WriteLine($"Policy: {(string?)policy?["id"]} v{(string?)policy?["version"]} — {(string?)policy?["name"]}  (illustrative example, not a real institution's policy — {(string?)policy?["path"]})");
+
+        var capabilities = StringsOf(profile["operational_capabilities"]);
+        Console.WriteLine(capabilities.Count > 0
+            ? $"Operational capabilities tested: {string.Join(", ", capabilities)}"
+            : "Operational capabilities tested: (not tagged for this task — see tasks/<id>/capabilities.json)");
+
+        var metrics = profile["metrics"]?.AsArray();
+        if (metrics is not null && metrics.Count > 0)
+        {
+            var rows = metrics.Select(m => new[]
+            {
+                (string?)m?["label"] ?? "",
+                FormatMetricValue(m?["value"], (string?)m?["unit"]),
+                FormatMetricValue(m?["threshold"], (string?)m?["unit"]),
+                (bool?)m?["required"] == false ? "optional" : "required",
+                (string?)m?["status"] ?? "-",
+            }).ToList();
+            PrintTable("Policy metrics", new[] { "Metric", "Measured", "Threshold", "Tier", "Status" }, rows);
+        }
+
+        var notEvaluated = StringsOf(profile["not_evaluated_dimensions"]);
+        if (notEvaluated.Count > 0)
+        {
+            PrintTable("Dimensions NOT evaluated by this benchmark (honestly disclosed, not hidden)",
+                new[] { "Dimension" }, notEvaluated.Select(d => new[] { d }).ToList());
+        }
+
+        var decision = profile["deployment_decision"]?.AsObject();
+        PrintTable("Deployment decision", new[] { "Field", "Value" }, new List<string[]>
+        {
+            new[] { "Overall", (string?)decision?["overall"] ?? "-" },
+            new[] { "Reason", (string?)decision?["reason"] ?? "-" },
+            new[] { "Metrics evaluated", $"{(int?)decision?["evaluated_metric_count"] ?? 0} of {(int?)decision?["total_defined_dimension_count"] ?? 0} defined dimensions" },
+        });
+
+        var reasons = decision?["reasons"]?.AsArray();
+        if (reasons is not null && reasons.Count > 0)
+        {
+            var rows = reasons.Select(r => new[]
+            {
+                (string?)r?["label"] ?? "",
+                FormatMetricValue(r?["actual"], "auto"),
+                (string?)r?["rule"] ?? "",
+                FormatMetricValue(r?["threshold"], "auto"),
+                (string?)r?["severity"] ?? "",
+            }).ToList();
+            PrintTable("Structured decision reasons", new[] { "Metric", "Actual", "Rule", "Threshold", "Severity" }, rows);
+        }
+
+        var restrictions = profile["deployment_restrictions"]?.AsObject();
+        if (restrictions is not null)
+        {
+            var rows = new List<string[]>();
+            foreach (var item in StringsOf(restrictions["permitted"])) rows.Add(new[] { "Permitted", item });
+            foreach (var item in StringsOf(restrictions["human_approval_required"])) rows.Add(new[] { "Human approval required", item });
+            foreach (var item in StringsOf(restrictions["not_permitted"])) rows.Add(new[] { "Not permitted", item });
+            if (rows.Count > 0)
+                PrintTable("Illustrative deployment restrictions (if PASS_WITH_CONDITIONS)", new[] { "Category", "Use" }, rows);
+        }
+
+        var provenance = profile["provenance"]?.AsObject();
+        PrintTable("Provenance (for reproducing this exact decision)", new[] { "Field", "Value" }, new List<string[]>
+        {
+            new[] { "Benchmark version", (string?)provenance?["benchmark_version"] ?? "-" },
+            new[] { "Git commit SHA", (string?)provenance?["git_commit_sha"] ?? "n/a (git not available)" },
+            new[] { "Policy", $"{(string?)provenance?["policy_id"]} v{(string?)provenance?["policy_version"]}" },
+            new[] { "Execution mode", (string?)provenance?["execution_mode"] ?? "-" },
+            new[] { "Dataset hash", (string?)provenance?["dataset_hash"] ?? "n/a" },
+            new[] { "Rubric hash", (string?)provenance?["rubric_hash"] ?? "n/a" },
+            new[] { "Run ID", (string?)provenance?["run_id"] ?? "-" },
+        });
+
+        Console.WriteLine($"Result hash: {(string?)profile["result_hash"]}");
+    }
+
+    private static string FormatMetricValue(JsonNode? node, string? unit)
+    {
+        if (node is null || node.GetValueKind() == JsonValueKind.Null) return "n/a";
+        var d = node.GetValue<double>();
+        return unit == "rate" ? $"{d:P1}" : d.ToString("0.####");
+    }
+
     private static List<string> StringsOf(JsonNode? arrayNode) =>
         arrayNode?.AsArray()?.Select(n => (string?)n ?? "").ToList() ?? new List<string>();
 
@@ -693,7 +834,7 @@ public static class Program
         return $"{node.GetValue<double>():P1}";
     }
 
-    private static void PrintTable(string title, string[] headers, IReadOnlyList<string[]> rows)
+    internal static void PrintTable(string title, string[] headers, IReadOnlyList<string[]> rows)
     {
         var widths = headers
             .Select((h, i) => Math.Max(h.Length, rows.Count == 0 ? 0 : rows.Max(r => r[i].Length)))

@@ -44,6 +44,11 @@ aml-bench-*/
 # `git add -f results/<file>.json` when they are worth citing.
 results/*.json
 
+# Same pattern for the assurance-profile archive (see assurance/README.md).
+# assurance/policy.default.json itself is tracked; only the generated
+# per-run profiles are ignored.
+assurance-profiles/*.json
+
 # Third-party submissions — keep the directory and its README but ignore
 # everyone else's agent code by default. Our own reference baselines are
 # explicit exceptions so they ship with the bench.
