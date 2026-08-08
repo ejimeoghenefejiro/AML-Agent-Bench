@@ -35,6 +35,8 @@ public static class Program
             return CompareCommand.Run(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "regress")
             return RegressCommand.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "load-dataset")
+            return LoadDatasetCommand.Run(args.Skip(1).ToArray());
 
         var envFile = DotEnv.Load();
         if (envFile is not null)
@@ -272,6 +274,7 @@ public static class Program
         Console.WriteLine("  aml-harness [agent-source] [--task <id>] [options]     run a benchmark + assurance profile");
         Console.WriteLine("  aml-harness compare <profile.json> <profile.json>...   compare two or more assurance profiles");
         Console.WriteLine("  aml-harness regress --baseline <p.json> --candidate <p.json>   detect an assurance regression");
+        Console.WriteLine("  aml-harness load-dataset --source-type <type> [options]        load a dataset via the adapter layer, write dataset_manifest.json");
         Console.WriteLine();
         Console.WriteLine("Agent source (pick one):");
         Console.WriteLine("  --agent <name>           subfolder of agents/ in this repo (default: csharp-sk)");
@@ -301,6 +304,7 @@ public static class Program
         Console.WriteLine("  5  invalid policy/configuration -- assurance profile could not be built");
         Console.WriteLine();
         Console.WriteLine("Exit codes (compare/regress): 0 = ok, 1 = regression detected (regress only), 6 = invalid comparison");
+        Console.WriteLine("Exit codes (load-dataset): 0 = ok, 64 = usage error, 65 = unsupported source type / invalid configuration / source or normalisation error");
     }
 
     /// <summary>

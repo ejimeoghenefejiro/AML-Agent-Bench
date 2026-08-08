@@ -2,7 +2,7 @@
   "task": "task-006-temporal-network-anomaly-detection",
   "pass_threshold_overall": 0.7,
   "evaluation_inputs": ["temporal_anomaly_report.md"],
-  "grounding_inputs": ["data/weekly_transfers.csv"],
+  "grounding_inputs": ["data/weekly_transfers.csv", "data/weekly_transfers.json"],
   "gold_evidence_annotations": "evidence-annotations.json",
   "dimensions": [
     {

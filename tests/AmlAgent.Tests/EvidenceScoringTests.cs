@@ -133,4 +133,80 @@ public class EvidenceScoringTests
         Assert.Equal(0, result.TotalClaims);
         Assert.Equal(0.0, result.Rate);
     }
+
+    private const string SampleJsonArray =
+        """[{"txn_id":"T1-001","amount":4500},{"txn_id":"T2-003","amount":24500},{"txn_id":"T3-001","amount":75000}]""";
+
+    [Fact]
+    public void ParseTxnIdsFromJson_TopLevelArray_ExtractsAllIds()
+    {
+        var ids = EvidenceScoring.ParseTxnIdsFromJson(SampleJsonArray);
+        Assert.Equal(new HashSet<string> { "T1-001", "T2-003", "T3-001" }, ids);
+    }
+
+    [Theory]
+    [InlineData("transactions")]
+    [InlineData("rows")]
+    [InlineData("data")]
+    [InlineData("transfers")]
+    [InlineData("records")]
+    public void ParseTxnIdsFromJson_WrappedUnderCommonKey_ExtractsAllIds(string wrapperKey)
+    {
+        var json = $$"""{"{{wrapperKey}}": [{"txn_id":"T1-001"},{"txn_id":"T2-003"}]}""";
+        var ids = EvidenceScoring.ParseTxnIdsFromJson(json);
+        Assert.Equal(new HashSet<string> { "T1-001", "T2-003" }, ids);
+    }
+
+    [Fact]
+    public void ParseTxnIdsFromJson_CustomIdField_IsRespected()
+    {
+        var json = """[{"id":"T1-001"},{"id":"T2-003"}]""";
+        var ids = EvidenceScoring.ParseTxnIdsFromJson(json, idField: "id");
+        Assert.Equal(new HashSet<string> { "T1-001", "T2-003" }, ids);
+    }
+
+    [Fact]
+    public void ParseTxnIdsFromJson_MalformedJson_ReturnsEmptySetNotThrow()
+    {
+        var ids = EvidenceScoring.ParseTxnIdsFromJson("{not valid json");
+        Assert.Empty(ids);
+    }
+
+    [Fact]
+    public void ParseTxnIdsFromJson_UnrecognisedShape_ReturnsEmptySet()
+    {
+        var ids = EvidenceScoring.ParseTxnIdsFromJson("""{"unexpected_key": [1,2,3]}""");
+        Assert.Empty(ids);
+    }
+
+    [Fact]
+    public void ParseTxnIdsFromJson_EmptyOrNullContent_ReturnsEmptySet()
+    {
+        Assert.Empty(EvidenceScoring.ParseTxnIdsFromJson(""));
+        Assert.Empty(EvidenceScoring.ParseTxnIdsFromJson("   "));
+    }
+
+    [Fact]
+    public void ParseTxnIdsFromFile_DispatchesByExtension()
+    {
+        Assert.Equal(new HashSet<string> { "T1-001", "T2-003", "T3-001" },
+            EvidenceScoring.ParseTxnIdsFromFile(SampleCsv, "data/weekly_transfers.csv"));
+        Assert.Equal(new HashSet<string> { "T1-001", "T2-003", "T3-001" },
+            EvidenceScoring.ParseTxnIdsFromFile(SampleJsonArray, "data/weekly_transfers.json"));
+    }
+
+    [Fact]
+    public void ParseTxnIdsFromFile_UnsupportedExtension_ReturnsEmptySetNotThrow()
+    {
+        var ids = EvidenceScoring.ParseTxnIdsFromFile("whatever content", "data/weekly_transfers.xlsx");
+        Assert.Empty(ids);
+    }
+
+    [Fact]
+    public void ParseTxnIdsFromFile_CsvAndJsonOfSameData_ProduceIdenticalSets()
+    {
+        var fromCsv = EvidenceScoring.ParseTxnIdsFromFile(SampleCsv, "a.csv");
+        var fromJson = EvidenceScoring.ParseTxnIdsFromFile(SampleJsonArray, "a.json");
+        Assert.Equal(fromCsv, fromJson);
+    }
 }

@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AmlAgent.Oracle\AmlAgent.Oracle.csproj" />
     <ProjectReference Include="..\AmlAgent.Evidence\AmlAgent.Evidence.csproj" />
+    <ProjectReference Include="..\AmlAgent.Adapters\AmlAgent.Adapters.csproj" />
   </ItemGroup>
 
 </Project>

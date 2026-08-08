@@ -450,6 +450,8 @@ Alongside the six rubric dimensions, `judge_report.json` now also carries the pr
 - **`eghr`** — Evidence-Grounded Hallucination Rate. The judge extracts atomic claims from the candidate's report and labels each `supported` / `unsupported` / `contradicted`. Any claim citing a transaction ID that doesn't exist in the source data is **deterministically forced to `unsupported`**, regardless of what the LLM said — the judge cannot inflate its own grounding. `rate = (unsupported + contradicted) / total_claims`.
 - **`evidence_traceability`** — citation precision/recall/F1. Computed **entirely deterministically** (regex citation extraction + set arithmetic, no LLM call), against a curated gold-evidence set per task (`tasks/<id>/evidence-annotations.json`).
 
+**Grounding data format:** `EvidenceScoring.ParseTxnIdsFromFile` dispatches by file extension, so a task's `grounding_inputs` (in `rubric.json`) can be **CSV or JSON** — `ParseTxnIdsFromJson` accepts a top-level array of objects, or an object wrapping that array under `transactions`/`rows`/`data`/`transfers`/`records`. Task 006 actually lists both `weekly_transfers.csv` and `weekly_transfers.json` (identical data, two representations) to prove the two formats produce identical valid-ID sets in a live run, not just in unit tests. An unrecognised extension (e.g. `.xlsx`) contributes no IDs rather than throwing — genuine spreadsheet support would need a parser dependency and isn't implemented.
+
 Example from a real `gpt-4o-mini` run on Task 006 (2026-08-07) — note this run's six-dimension rubric scored `evidence_citation: 3/5` and passed overall at 80%, while the deterministic traceability metric shows the report actually cited only 1 of the 13 gold-evidence transactions:
 
 ```json

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace AmlAgent.Evidence;
@@ -39,6 +41,58 @@ public static class EvidenceScoring
             if (id.Length > 0) ids.Add(id);
         }
         return ids;
+    }
+
+    /// <summary>
+    /// Parses the set of real transaction IDs out of JSON grounding data.
+    /// Accepts a top-level JSON array of objects (each with an idField
+    /// property), or an object wrapping that array under a common key
+    /// ("transactions", "rows", "data", "transfers", "records" -- whichever
+    /// is present first). Malformed JSON or an unrecognised shape returns
+    /// an empty set rather than throwing, matching ParseTxnIdsFromCsv's
+    /// "no data available" behaviour on a missing column.
+    /// </summary>
+    public static HashSet<string> ParseTxnIdsFromJson(string jsonContent, string idField = "txn_id")
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(jsonContent)) return ids;
+
+        JsonNode? root;
+        try { root = JsonNode.Parse(jsonContent); }
+        catch (JsonException) { return ids; }
+
+        var array = root as JsonArray;
+        if (array is null && root is JsonObject obj)
+        {
+            foreach (var key in new[] { "transactions", "rows", "data", "transfers", "records" })
+            {
+                if (obj[key] is JsonArray candidate) { array = candidate; break; }
+            }
+        }
+        if (array is null) return ids;
+
+        foreach (var item in array)
+        {
+            var id = item?[idField]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(id)) ids.Add(id);
+        }
+        return ids;
+    }
+
+    /// <summary>
+    /// Parses transaction IDs out of a grounding file's content, choosing
+    /// CSV or JSON parsing by the file's extension. An unrecognised
+    /// extension returns an empty set (no data contributed), not an
+    /// exception -- callers can still record that the file existed but
+    /// wasn't a supported format.
+    /// </summary>
+    public static HashSet<string> ParseTxnIdsFromFile(string content, string fileName, string idField = "txn_id")
+    {
+        if (fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            return ParseTxnIdsFromJson(content, idField);
+        if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            return ParseTxnIdsFromCsv(content, idField);
+        return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>Every transaction-ID-shaped token in free text, including duplicates.</summary>

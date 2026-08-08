@@ -297,15 +297,22 @@ internal static class JudgeAgent
     }
 
     /// <summary>Reads every grounding CSV in the workspace and unions their txn_id columns.</summary>
+    /// <summary>
+    /// Reads every grounding file's txn_ids, dispatching by extension via
+    /// EvidenceScoring.ParseTxnIdsFromFile -- CSV and JSON grounding data
+    /// are both supported (and unioned if a task provides both, e.g. two
+    /// representations of the same ledger). An unsupported format
+    /// contributes no IDs but doesn't throw, so a mixed-format
+    /// grounding_inputs list degrades gracefully rather than crashing.
+    /// </summary>
     private static HashSet<string> ParseValidTxnIds(string workspace, List<string> groundingInputs)
     {
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var rel in groundingInputs)
         {
-            if (!rel.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)) continue;
             var full = Path.Combine(workspace, rel);
             if (!File.Exists(full)) continue;
-            foreach (var id in EvidenceScoring.ParseTxnIdsFromCsv(File.ReadAllText(full)))
+            foreach (var id in EvidenceScoring.ParseTxnIdsFromFile(File.ReadAllText(full), rel))
                 ids.Add(id);
         }
         return ids;
