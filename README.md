@@ -466,6 +466,19 @@ Example from a real `gpt-4o-mini` run on Task 006 (2026-08-07) — note this run
 
 This is the kind of gap the rubric score alone hides: a report can look compliant (cautious tone, some real citations, no accusations) while still being weakly grounded against the specific evidence that matters. See [docs/dimension-mapping.md](docs/dimension-mapping.md) for scope and limitations (currently task-006 only; gold set is hand-curated, not yet multi-annotator).
 
+### 8.4 The assurance profile: policy-based deployment decisions
+
+Every run against a judged task also produces `assurance_profile.json` (workspace copy + archival copy in `assurance-profiles/`, mirroring `results/`) — a machine-readable, schema-validated answer to *"is this agent suitable for operational deployment, and under what conditions?"*, per the "AML Agent Bench Real World Assurance Profile" vision document and its CLI-Only Assurance Roadmap follow-up (planning notes kept outside this repo; see [assurance/README.md](assurance/README.md) for the in-repo summary).
+
+- **`--policy <path>`** selects which policy to evaluate against (default `assurance/policy.default.json`; a stricter example ships at `assurance/policies/bank-strict.json`). Each threshold is `required` (a critical gate — failing it blocks deployment) or optional (a warning — failing it only downgrades the decision). A malformed or impossible policy is rejected at load time with a clear error, without crashing the rest of the run.
+- The decision is always one of `PASS`, `PASS_WITH_CONDITIONS`, or `NOT_READY_FOR_DEPLOYMENT` — separated from `execution_status` (did the agent process complete) and `benchmark_verdict` (did xUnit + judge pass). **A benchmark PASS is never the same thing as a deployment PASS** — they're printed side by side precisely because they disagree in practice (a report can score 76.7% on the six-dimension rubric while its EGHR/traceability numbers fail the policy outright).
+- `aml-harness compare <profile.json> <profile.json> ...` prints a side-by-side table of two or more runs (agent, model, task, policy, task performance, EGHR, precision, recall, F1, fabricated citations, decision) and writes `comparison_result.json` for automation. Warns when the compared runs aren't actually equivalent (different task, policy, benchmark version, or dataset).
+- `aml-harness regress --baseline <profile.json> --candidate <profile.json>` diffs two runs metric-by-metric, reports newly-failed/newly-passed thresholds, flags `ASSURANCE REGRESSION DETECTED` when the decision strictly worsens, and writes `regression_result.json`. Exit code 1 on a detected regression, so it's usable as a CI-style gate.
+- Every profile is validated against a formal schema (`AmlAgent.Evidence.AssuranceProfileSchema`) before being written — a profile that doesn't match the schema fails generation explicitly rather than being silently written malformed.
+- Five of the vision document's nine trust dimensions (fairness, explanation faithfulness, audit completeness, calibration, consistency) are **not implemented** and are listed under `not_evaluated_dimensions` with that status explicitly — never a fabricated PASS.
+
+See [assurance/README.md](assurance/README.md) for the full scope, honesty caveats, and exactly what is/isn't measured, and [assurance-profiles/README.md](assurance-profiles/README.md) for the archive's file format.
+
 ---
 
 ## 9. Results: the `bench_result.json` contract
@@ -671,7 +684,31 @@ dotnet run --project src\AmlAgent.Harness -- [agent-source] [--task <id>] [optio
 | `--max-steps <n>` | Override `BENCH_MAX_STEPS`. |
 | `--oracle` | Skip the agent; produce output via `AmlAgent.Oracle`. Only valid for `aml-transaction-network`. |
 | `--no-judge` | Skip the LLM-as-judge stage even if `rubric.json` exists. |
+| `--policy <path>` | Assurance policy to evaluate against (default `assurance/policy.default.json`). E.g. `--policy assurance/policies/bank-strict.json`. |
 | `--keep-workspace` | Don't delete the temp workspace on exit (useful for inspection). |
+
+**Exit codes** (the `run` flow, i.e. no subcommand):
+
+| Code | Meaning |
+|---|---|
+| `0` | Completed, benchmark PASS, and assurance decision `PASS` (or no judge ran for this task) |
+| `1` | Execution failure — the agent process itself crashed or exited non-zero |
+| `2` | Benchmark failure — xUnit or the judge failed (`overall_verdict != PASS`) |
+| `3` | Benchmark passed; assurance decision is `PASS_WITH_CONDITIONS` |
+| `4` | Benchmark passed; assurance decision is `NOT_READY_FOR_DEPLOYMENT` |
+| `5` | Invalid assurance policy or configuration (malformed JSON, unknown direction, impossible threshold) — the benchmark result itself is still written, only the assurance profile is skipped |
+
+The harness prints the exact reason for its exit code as its last line, e.g. `[harness] exit code 4: benchmark passed, assurance NOT_READY_FOR_DEPLOYMENT`.
+
+#### `aml-harness compare <profile.json> <profile.json> ...`
+
+Side-by-side comparison of two or more `assurance_profile.json` files (agent, model, task, policy, task performance, EGHR, precision, recall, F1, fabricated citations, decision). Warns if the compared runs aren't equivalent (different task/policy/benchmark version/dataset) rather than silently treating them as comparable. Writes `comparison_result.json` alongside the console table. Exit codes: `0` = compared successfully, `6` = invalid comparison (file not found, malformed, or fewer than two profiles given).
+
+#### `aml-harness regress --baseline <profile.json> --candidate <profile.json>`
+
+Diffs two `assurance_profile.json` files metric-by-metric, reports newly-failed/newly-passed thresholds, and flags `ASSURANCE REGRESSION DETECTED` when the deployment decision strictly worsens. Writes `regression_result.json`. Exit codes: `0` = no regression, `1` = regression detected, `6` = invalid comparison.
+
+See [assurance/README.md](assurance/README.md) for what these commands do and do not claim.
 
 ### `aml-oracle` (the reference solver — no LLM, no Docker)
 

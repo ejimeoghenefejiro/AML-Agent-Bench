@@ -69,3 +69,22 @@ the capability to deliver, not the finished six-dimension instrument.
 4. Add a human-annotated judge-agreement sample to start RQ3 judge
    reliability work — including validating the LLM's own EGHR claim-support
    labels against human judgement, not just the citation-existence check.
+
+## Related, newer work: the assurance-profile prototype
+
+Since this page was written, a second (related but distinct) initiative
+has been built on top of the EGHR and evidence-traceability metrics
+described above: `assurance/` — a machine-readable, policy-evaluated
+"AML Agent Assurance Profile" per an industry-facing vision document kept
+outside this repo, not the six-dimension PhD-proposal framework this page
+tracks. It reuses the same primary metrics (EGHR, evidence-traceability
+F1, fabricated citations) plus task performance, evaluated against a
+configurable policy, producing a `PASS` / `PASS_WITH_CONDITIONS` /
+`NOT_READY_FOR_DEPLOYMENT` deployment decision — with `compare` and
+`regress` CLI commands for cross-run comparison. Same honesty discipline
+as this page: the five dimensions this repo doesn't measure (fairness,
+faithfulness, audit completeness, calibration, consistency) are marked
+`not_implemented` in every generated profile, never faked. See
+[assurance/README.md](../assurance/README.md) for the full picture and
+[README.md §8.4](../README.md#84-the-assurance-profile-policy-based-deployment-decisions)
+for the quick summary.

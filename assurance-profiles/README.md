@@ -26,6 +26,10 @@ assurance-profiles/<UTC-timestamp>-<task>-<agent>.json
   and do disagree.
 - `agent` / `benchmark` / `scenario_pack` / `jurisdiction_profile` — identity
   fields.
+- `operational_capabilities` — which capabilities this task actually
+  exercises (e.g. `anomaly_detection`, `evidence_based_case_reasoning`),
+  read from `tasks/<id>/capabilities.json`. An untagged task shows an empty
+  array rather than a guessed value.
 - `policy` — id, name, version and path of the policy this run was
   evaluated against (selectable at runtime with `--policy <path>`).
 - `metrics` — each policy-defined metric: measured value, threshold,
@@ -43,9 +47,16 @@ assurance-profiles/<UTC-timestamp>-<task>-<agent>.json
 - `evidence_summary` — the claims and citations behind the EGHR and
   traceability numbers, pulled from the same judge output.
 - `provenance` — run ID, workspace path, timestamps, execution mode,
-  benchmark version, git commit SHA, policy id/version, and SHA-256 hashes
-  of the task's dataset and rubric — enough to state what exact benchmark
-  version, task version, model, policy and dataset a decision came from.
+  benchmark version, git commit SHA, policy id/version/file hash, dataset
+  hash, rubric hash, a task fingerprint (stands in for a task version
+  number, which doesn't exist yet), a benchmark-config hash, model
+  identifier, temperature, judge model/config, .NET runtime/OS, and a
+  `reproducibility_note` stating plainly what is and isn't deterministic
+  (the pipeline's own scoring is; the underlying LLM's output isn't,
+  since no provider-guaranteed seed is configured) — enough to state what
+  exact benchmark version, task version, model, policy and dataset a
+  decision came from. See [assurance/README.md](../assurance/README.md#schema-validation-and-provenance)
+  for the full field-by-field rationale.
 - `result_hash` — SHA-256 of the profile's own content (excluding this
   field), for basic tamper-evidence.
 
