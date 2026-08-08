@@ -615,10 +615,20 @@ public static class Program
                 var text = previewNode.GetValue<string>();
                 var citationCount = (int?)obj["citation_count"];
                 var citationNote = citationCount is int c ? $", {c} txn-ID citations found by regex" : "";
-                Console.WriteLine();
-                Console.WriteLine($"-- {name}  ({size} bytes{citationNote}) --");
-                foreach (var line in text.Replace("\r\n", "\n").Split('\n'))
-                    Console.WriteLine($"   {line}");
+                var title = $"{name}  ({size} bytes{citationNote})";
+
+                if (name.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                {
+                    var sectionRows = ParseMarkdownSections(text);
+                    if (sectionRows.Count > 0)
+                        PrintTable(title, new[] { "Section", "Content" }, sectionRows);
+                    else
+                        PrintRawText(title, text);
+                }
+                else
+                {
+                    PrintRawText(title, text);
+                }
             }
             else
             {
@@ -626,6 +636,59 @@ public static class Program
                 Console.WriteLine($"-- {name}  ({size} bytes) — binary or unrecognised format, not previewed --");
             }
         }
+    }
+
+    private static void PrintRawText(string title, string text)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"-- {title} --");
+        foreach (var line in text.Replace("\r\n", "\n").Split('\n'))
+            Console.WriteLine($"   {line}");
+    }
+
+    /// <summary>
+    /// Breaks a markdown report into (Section, Content) rows for tabular
+    /// display: each "#"/"##" heading starts a new section; a bullet list
+    /// item under a heading becomes its own row (so e.g. "Week-by-week
+    /// Analysis" reads as one row per week instead of one wall of text);
+    /// any other non-blank text is grouped into a single paragraph row.
+    /// </summary>
+    private static List<string[]> ParseMarkdownSections(string markdown)
+    {
+        var rows = new List<string[]>();
+        var section = "(intro)";
+        var buffer = new List<string>();
+
+        void Flush()
+        {
+            var text = string.Join(' ', buffer).Trim();
+            if (text.Length > 0)
+                rows.Add(new[] { section, Truncate(text, 90) });
+            buffer.Clear();
+        }
+
+        foreach (var rawLine in markdown.Replace("\r\n", "\n").Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0) continue;
+
+            if (line.StartsWith('#'))
+            {
+                Flush();
+                section = line.TrimStart('#', ' ').Trim();
+            }
+            else if (line.StartsWith("- ") || line.StartsWith("* "))
+            {
+                Flush(); // any preceding paragraph under this heading becomes its own row first
+                rows.Add(new[] { section, Truncate(line[2..].Trim(), 90) });
+            }
+            else
+            {
+                buffer.Add(line);
+            }
+        }
+        Flush();
+        return rows;
     }
 
     /// <summary>Quick-scan headline numbers — the five figures people ask about first.</summary>
