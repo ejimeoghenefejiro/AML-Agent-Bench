@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Threading;
 using AmlAgent.Adapters.Canonical;
 using AmlAgent.Adapters.Formats;
 using Xunit;
@@ -49,6 +51,51 @@ public class ParquetDataAdapterTests
         Assert.Equal(original.Channel, loaded.Channel);
         Assert.Equal(original.Jurisdiction, loaded.Jurisdiction);
         Assert.Equal(original.SarLinked, loaded.SarLinked);
+        Assert.Equal(original.Timestamp, loaded.Timestamp);
+    }
+
+    /// <summary>
+    /// Regression coverage for a real bug found while building the task-007
+    /// multi-source reference task: ParquetDataAdapter's Field() delegate used
+    /// a bare `value?.ToString()` on the raw column value, which -- exactly
+    /// like the earlier PostgreSQL/SQL Server bug this session already fixed
+    /// via DbValueFormatter -- renders a DateTime using the CURRENT THREAD
+    /// CULTURE. Under en-GB that turned "2026-02-05" (5 Feb) into
+    /// "05/02/2026", which TransactionRowMapper's InvariantCulture parser
+    /// then read back as 2 May (US month/day order) -- a silent 3-month date
+    /// corruption with no exception thrown. Fixed by routing through
+    /// DbValueFormatter.ToFieldString like every other adapter's Field()
+    /// delegate. This test forces en-GB specifically to catch the regression
+    /// again if the fix is ever reverted to a bare ToString().
+    /// </summary>
+    [Fact]
+    public async Task RoundTrip_AmbiguousDayMonthTimestamp_IsCultureInvariantEvenUnderEnGb()
+    {
+        var original = SampleTxn("T1-001", 100m) with { Timestamp = new DateTimeOffset(2026, 2, 5, 11, 0, 0, TimeSpan.Zero) };
+        await using var stream = await WriteSampleParquetAsync(new[] { original });
+
+        var loadedTimestamp = await RunUnderCultureAsync("en-GB", async () =>
+        {
+            var adapter = new ParquetDataAdapter();
+            var dataset = await adapter.LoadFromStreamAsync(stream, "ambiguous-date.parquet");
+            return dataset.Transactions[0].Timestamp;
+        });
+
+        Assert.Equal(new DateTimeOffset(2026, 2, 5, 11, 0, 0, TimeSpan.Zero), loadedTimestamp);
+    }
+
+    private static async Task<T> RunUnderCultureAsync<T>(string cultureName, Func<Task<T>> action)
+    {
+        var original = Thread.CurrentThread.CurrentCulture;
+        try
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo(cultureName);
+            return await action();
+        }
+        finally
+        {
+            Thread.CurrentThread.CurrentCulture = original;
+        }
     }
 
     [Fact]

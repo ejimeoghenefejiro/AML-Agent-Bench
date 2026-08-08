@@ -70,8 +70,7 @@ public sealed class ParquetDataAdapter : IAmlDataAdapter
                 string? Field(string name)
                 {
                     if (!columnsByName.TryGetValue(name, out var col) || rowIndex >= col.Length) return null;
-                    var value = col.GetValue(rowIndex);
-                    return value?.ToString();
+                    return DbValueFormatter.ToFieldString(col.GetValue(rowIndex));
                 }
 
                 var txn = TransactionRowMapper.Map(Field, "parquet", sourceName, null, AdapterId, AdapterVersion, i + 1);

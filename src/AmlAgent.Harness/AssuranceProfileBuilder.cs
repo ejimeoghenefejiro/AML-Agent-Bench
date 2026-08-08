@@ -66,6 +66,18 @@ internal static class AssuranceProfileBuilder
 
         var decision = AssuranceEngine.Decide(results, notImplemented);
 
+        // Case-level evidence integrity is a distinct gate from the judge's
+        // agent-level metrics above: EGHR/fabricated-citations/missing-gold-evidence
+        // all ask "did the agent's report stay grounded in the evidence it was
+        // given". case_manifest.json (written by StageCanonicalCaseIfPresent for
+        // tasks with a case-definition.json) instead asks "was the evidence itself
+        // trustworthy" -- dangling/incompatible references and cross-source
+        // duplicate-content conflicts in the canonical case, independent of
+        // anything the agent said. A benchmark run is not assurance-valid if this
+        // fails, no matter how well the agent's report scored.
+        var (caseIntegrity, caseIntegrityAssessment) = EvaluateCaseEvidenceIntegrity(workspace);
+        decision = AssuranceEngine.ApplyCaseIntegrityGate(decision, caseIntegrityAssessment);
+
         var task = (string?)benchResult["task"] ?? "unknown-task";
         var executionStatus = (int?)benchResult["agent_exit_code"] == 0 ? "completed" : "failed";
         var benchmarkVerdict = (string?)benchResult["overall_verdict"] ?? "-";
@@ -132,10 +144,11 @@ internal static class AssuranceProfileBuilder
             ["deployment_restrictions"] = policy["deployment_restrictions_if_pass_with_conditions"]?.DeepClone(),
             ["evidence_summary"] = new JsonObject
             {
-                ["eghr"] = judge["eghr"]?.DeepClone(),
-                ["evidence_traceability"] = judge["evidence_traceability"]?.DeepClone(),
+                ["eghr"] = judge["eghr"]?.DeepClone(), // agent hallucination: unsupported/contradicted claims
+                ["evidence_traceability"] = judge["evidence_traceability"]?.DeepClone(), // includes fabricated_citations and missing_gold_citations_list
                 ["claims"] = judge["claims"]?.DeepClone(),
             },
+            ["case_evidence_integrity"] = caseIntegrity,
             ["provenance"] = new JsonObject
             {
                 ["run_id"] = benchResult["run_id"]?.DeepClone(),
@@ -208,6 +221,56 @@ internal static class AssuranceProfileBuilder
 
         var values = caps.Select(c => (string?)c).Where(s => s is not null).Select(s => (JsonNode)s!);
         return new JsonArray(values.ToArray());
+    }
+
+    /// <summary>
+    /// Reads workspace/case_manifest.json (written by
+    /// Program.StageCanonicalCaseIfPresent when a task has a
+    /// case-definition.json), if present, and hands its counts to
+    /// AssuranceEngine.EvaluateCaseIntegrity for the actual decision logic --
+    /// this method is pure I/O + JSON shaping, no gating rules of its own.
+    /// Absent case_manifest.json (a task with no multi-source case) is not an
+    /// error -- "present": false and no reasons, so existing single-source
+    /// tasks see no behaviour change at all.
+    /// </summary>
+    private static (JsonObject Profile, CaseIntegrityAssessment Assessment) EvaluateCaseEvidenceIntegrity(string workspace)
+    {
+        var manifestPath = Path.Combine(workspace, "case_manifest.json");
+        var manifest = File.Exists(manifestPath) ? JsonNode.Parse(File.ReadAllText(manifestPath))?.AsObject() : null;
+        var integrity = manifest?["evidence_integrity"]?.AsObject();
+        if (integrity is null)
+            return (new JsonObject { ["present"] = false }, AssuranceEngine.EvaluateCaseIntegrity(false, 0, 0));
+
+        var dangling = integrity["dangling_references"]?.AsArray() ?? new JsonArray();
+        var missingTxn = integrity["missing_transaction_references"]?.AsArray() ?? new JsonArray();
+        var incompatible = integrity["incompatible_evidence_types"]?.AsArray() ?? new JsonArray();
+        var duplicates = integrity["duplicate_evidence_ids"]?.AsArray() ?? new JsonArray();
+        var invalidRefCount = dangling.Count + missingTxn.Count + incompatible.Count;
+        var brokenLineageCount = duplicates.Count;
+
+        var assessment = AssuranceEngine.EvaluateCaseIntegrity(true, invalidRefCount, brokenLineageCount);
+
+        var profile = new JsonObject
+        {
+            ["present"] = true,
+            ["status"] = (string?)integrity["status"],
+            ["case_manifest_path"] = "case_manifest.json",
+            ["canonical_case_hash"] = (string?)manifest?["canonical_case_hash"],
+            ["invalid_source_evidence_reference"] = new JsonObject
+            {
+                ["count"] = invalidRefCount,
+                ["dangling_references"] = dangling.DeepClone(),
+                ["missing_transaction_references"] = missingTxn.DeepClone(),
+                ["incompatible_evidence_types"] = incompatible.DeepClone(),
+            },
+            ["broken_canonical_evidence_lineage"] = new JsonObject
+            {
+                ["count"] = brokenLineageCount,
+                ["duplicate_evidence_ids"] = duplicates.DeepClone(),
+            },
+        };
+
+        return (profile, assessment);
     }
 
     /// <summary>Pulls the raw metric values this benchmark actually computes out of a judge_report.json-shaped object.</summary>

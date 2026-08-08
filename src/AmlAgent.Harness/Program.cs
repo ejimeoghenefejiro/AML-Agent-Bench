@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AmlAgent.Adapters;
+using AmlAgent.Adapters.Export;
+using AmlAgent.Adapters.Manifest;
 using AmlAgent.Oracle;
 
 namespace AmlAgent.Harness;
@@ -37,6 +40,8 @@ public static class Program
             return RegressCommand.Run(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "load-dataset")
             return LoadDatasetCommand.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "load-case")
+            return LoadCaseCommand.Run(args.Skip(1).ToArray());
 
         var envFile = DotEnv.Load();
         if (envFile is not null)
@@ -93,6 +98,8 @@ public static class Program
             StageWorkspace(taskDir, workspace);
             Console.WriteLine($"[harness] task     = {task}");
             Console.WriteLine($"[harness] workspace = {workspace}");
+
+            StageCanonicalCaseIfPresent(workspace);
 
             int agentRc;
             if (useOracle)
@@ -275,6 +282,7 @@ public static class Program
         Console.WriteLine("  aml-harness compare <profile.json> <profile.json>...   compare two or more assurance profiles");
         Console.WriteLine("  aml-harness regress --baseline <p.json> --candidate <p.json>   detect an assurance regression");
         Console.WriteLine("  aml-harness load-dataset --source-type <type> [options]        load a dataset via the adapter layer, write dataset_manifest.json");
+        Console.WriteLine("  aml-harness load-case --case <case-definition.json>            load+merge a multi-source case, write case_manifest.json");
         Console.WriteLine();
         Console.WriteLine("Agent source (pick one):");
         Console.WriteLine("  --agent <name>           subfolder of agents/ in this repo (default: csharp-sk)");
@@ -305,6 +313,7 @@ public static class Program
         Console.WriteLine();
         Console.WriteLine("Exit codes (compare/regress): 0 = ok, 1 = regression detected (regress only), 6 = invalid comparison");
         Console.WriteLine("Exit codes (load-dataset): 0 = ok, 64 = usage error, 65 = unsupported source type / invalid configuration / source or normalisation error");
+        Console.WriteLine("Exit codes (load-case): 0 = ok, 64 = usage/definition error, 66 = a source failed to load, 67 = evidence integrity failed");
     }
 
     /// <summary>
@@ -391,6 +400,52 @@ public static class Program
             var src = Path.Combine(taskDir, name);
             if (File.Exists(src))
                 File.Copy(src, Path.Combine(workspace, name), overwrite: true);
+        }
+    }
+
+    /// <summary>
+    /// Opt-in multi-source case support: if the staged workspace contains a
+    /// case-definition.json (a task's environment/ can now include one alongside,
+    /// or instead of, a flat data/ file), resolve every source's adapter, load and
+    /// merge them via CanonicalCaseMerger, validate cross-source evidence
+    /// references, and materialise the result back into workspace/data/*.csv|json
+    /// (CanonicalCaseExporter) plus workspace/case_manifest.json. Existing tasks
+    /// have no case-definition.json, so this is a no-op for every task that
+    /// predates this feature -- zero change to the run flow below.
+    /// </summary>
+    private static void StageCanonicalCaseIfPresent(string workspace)
+    {
+        var caseDefPath = Path.Combine(workspace, "case-definition.json");
+        if (!File.Exists(caseDefPath)) return;
+
+        Console.WriteLine("[harness] case-definition.json found -- loading multi-source canonical case");
+        try
+        {
+            var definition = CaseDefinitionReader.Parse(File.ReadAllText(caseDefPath), caseDefPath, workspace);
+            var result = CaseLoader.LoadAsync(definition, AdapterRegistry.CreateDefault()).GetAwaiter().GetResult();
+
+            foreach (var entry in result.MergedCase.SourceManifest)
+                Console.WriteLine($"[harness]   loaded {entry.SourceType,-12} adapter={entry.Adapter} v{entry.AdapterVersion} records={entry.RecordCount}");
+            foreach (var failure in result.Failures)
+                Console.Error.WriteLine($"[harness]   FAILED {failure.SourceType,-12} role={failure.Role ?? "?"}: {failure.ErrorMessage}");
+            if (result.MergedCase.Conflicts.Count > 0)
+                Console.WriteLine($"[harness]   {result.MergedCase.Conflicts.Count} merge conflict(s) -- see case_manifest.json");
+            Console.WriteLine($"[harness]   evidence_integrity = {result.EvidenceIntegrity.Status}");
+
+            var manifest = CaseManifestBuilder.Build(result, DateTimeOffset.UtcNow);
+            CaseManifestBuilder.Write(manifest, Path.Combine(workspace, "case_manifest.json"));
+            CanonicalCaseExporter.ExportToDirectory(result.MergedCase, Path.Combine(workspace, "data"));
+
+            if (!result.AllSourcesLoaded || !result.EvidenceIntegrity.Passed)
+                Console.Error.WriteLine("[harness]   WARNING: case has load failures or evidence-integrity failures -- see case_manifest.json (run continues; assurance evaluation gates on this separately)");
+        }
+        catch (InvalidCaseDefinitionException ex)
+        {
+            // A malformed case-definition.json is a task-authoring error, not a
+            // reason to silently skip case loading -- surfaced loudly, but the
+            // benchmark run itself still proceeds against whatever the task's
+            // flat data/ files (if any) already provide.
+            Console.Error.WriteLine($"[harness]   invalid case-definition.json: {ex.Message}");
         }
     }
 

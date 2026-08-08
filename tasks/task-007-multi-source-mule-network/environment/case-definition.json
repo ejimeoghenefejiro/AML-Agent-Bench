@@ -1,0 +1,25 @@
+{
+  "case_id": "task-007-mule-network",
+  "sources": [
+    {
+      "source_type": "csv",
+      "path": "data/transactions_primary.csv",
+      "role": "transactions_primary_bank"
+    },
+    {
+      "source_type": "json",
+      "path": "data/transactions_correspondent.json",
+      "role": "transactions_correspondent_bank"
+    },
+    {
+      "source_type": "parquet",
+      "path": "data/transactions_archive.parquet",
+      "role": "transactions_archive"
+    },
+    {
+      "source_type": "graphml",
+      "path": "data/relationships.graphml",
+      "role": "relationships_and_watchlist"
+    }
+  ]
+}

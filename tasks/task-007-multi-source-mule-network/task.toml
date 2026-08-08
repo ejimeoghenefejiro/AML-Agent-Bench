@@ -1,0 +1,16 @@
+id = "task-007-multi-source-mule-network"
+name = "Multi-Source Mule Network Investigation"
+difficulty = "hard"
+tags = ["fintech", "aml", "mule-network", "multi-source", "app-fraud", "regtech", "compliance", "llm-as-judge", "evidence-integrity"]
+
+description = "Evaluate whether an AI agent can reconstruct a mule network from four heterogeneous sources (a primary bank's CSV ledger, a correspondent bank's JSON export, an archived Parquet ledger, and a GraphML relationship/watchlist graph merged into one canonical case), correctly separate the suspicious network from innocent accounts that merely co-occur in the same data, and produce an evidence-grounded, audit-trail-aware report."
+
+expected_outputs = [
+  "mule_network_findings.csv",
+  "mule_network_report.md",
+]
+
+# Evaluators applied after the agent exits.
+[evaluators]
+xunit = "tests/AmlAgent.Tests/AmlAgent.Tests.csproj"
+judge_rubric = "rubric.json"

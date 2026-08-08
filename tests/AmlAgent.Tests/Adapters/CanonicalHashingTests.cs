@@ -119,4 +119,66 @@ public class CanonicalHashingTests
         var run2 = CanonicalAmlDataset.Empty() with { Transactions = new[] { Txn("T1"), Txn("T2") } };
         Assert.Equal(CanonicalHashing.ComputeNormalisationHash(run1), CanonicalHashing.ComputeNormalisationHash(run2));
     }
+
+    private static CanonicalAmlCase EmptyCase(string schemaVersion = CanonicalSchema.Version) => new(
+        schemaVersion,
+        Array.Empty<CanonicalTransaction>(), Array.Empty<CanonicalAccount>(), Array.Empty<CanonicalCustomer>(),
+        Array.Empty<CanonicalEntity>(), Array.Empty<CanonicalRelationship>(), Array.Empty<CanonicalCase>(),
+        Array.Empty<CanonicalAlert>(), Array.Empty<CanonicalEvidence>(), Array.Empty<CanonicalJurisdiction>(),
+        Array.Empty<CanonicalSar>(), Array.Empty<MergeConflict>(), Array.Empty<SourceManifestEntry>());
+
+    [Fact]
+    public void ComputeCaseHash_SameCaseContent_ProducesSameHash()
+    {
+        var case1 = EmptyCase() with { Transactions = new[] { Txn("T1"), Txn("T2") } };
+        var case2 = EmptyCase() with { Transactions = new[] { Txn("T1"), Txn("T2") } };
+        Assert.Equal(CanonicalHashing.ComputeCaseHash(case1), CanonicalHashing.ComputeCaseHash(case2));
+    }
+
+    [Fact]
+    public void ComputeCaseHash_DifferentTransactionContent_ProducesDifferentHash()
+    {
+        var case1 = EmptyCase() with { Transactions = new[] { Txn("T1", amount: 100m) } };
+        var case2 = EmptyCase() with { Transactions = new[] { Txn("T1", amount: 999m) } };
+        Assert.NotEqual(CanonicalHashing.ComputeCaseHash(case1), CanonicalHashing.ComputeCaseHash(case2));
+    }
+
+    [Fact]
+    public void ComputeCaseHash_IsIndependentOfConflictsAndSourceManifest()
+    {
+        // Conflicts/SourceManifest are merge-process metadata, not case content --
+        // two cases with identical records but different conflict/manifest
+        // bookkeeping must still hash identically.
+        var conflict = new MergeConflict("transaction", "T1", "conflicting_value", "differs");
+        var manifestEntry = new SourceManifestEntry("csv", "a.csv", "csv", "1.0.0", 1, "sha256:aaaa");
+
+        var withMetadata = EmptyCase() with
+        {
+            Transactions = new[] { Txn("T1") },
+            Conflicts = new[] { conflict },
+            SourceManifest = new[] { manifestEntry },
+        };
+        var withoutMetadata = EmptyCase() with { Transactions = new[] { Txn("T1") } };
+
+        Assert.Equal(CanonicalHashing.ComputeCaseHash(withMetadata), CanonicalHashing.ComputeCaseHash(withoutMetadata));
+    }
+
+    [Fact]
+    public void ComputeCaseHash_IsIndependentOfCollectionOrder()
+    {
+        var forward = EmptyCase() with { Transactions = new[] { Txn("T1"), Txn("T2") } };
+        var reversed = EmptyCase() with { Transactions = new[] { Txn("T2"), Txn("T1") } };
+        Assert.Equal(CanonicalHashing.ComputeCaseHash(forward), CanonicalHashing.ComputeCaseHash(reversed));
+    }
+
+    [Fact]
+    public void ComputeCaseHash_MatchesComputeNormalisationHash_ForEquivalentContent()
+    {
+        // ComputeCaseHash and ComputeNormalisationHash share the same underlying
+        // content-hash routine -- a dataset and a case with identical records must
+        // produce the identical hash, proving they're really the same algorithm.
+        var dataset = CanonicalAmlDataset.Empty() with { Transactions = new[] { Txn("T1") } };
+        var amlCase = EmptyCase() with { Transactions = new[] { Txn("T1") } };
+        Assert.Equal(CanonicalHashing.ComputeNormalisationHash(dataset), CanonicalHashing.ComputeCaseHash(amlCase));
+    }
 }

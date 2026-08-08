@@ -1,0 +1,35 @@
+[
+  {
+    "transaction_id": "T1-003",
+    "source_account": "M201",
+    "destination_account": "M301",
+    "amount": "14800.00",
+    "currency": "GBP",
+    "timestamp": "2026-02-02T10:00:00Z",
+    "channel": "faster_payment",
+    "jurisdiction": "GB",
+    "sar_linked": "true"
+  },
+  {
+    "transaction_id": "T2-001",
+    "source_account": "M301",
+    "destination_account": "EXT401",
+    "amount": "26000.00",
+    "currency": "USD",
+    "timestamp": "2026-02-02T11:00:00Z",
+    "channel": "wire",
+    "jurisdiction": "AE",
+    "sar_linked": "true"
+  },
+  {
+    "transaction_id": "T2-002",
+    "source_account": "N160",
+    "destination_account": "N170",
+    "amount": "5000.00",
+    "currency": "GBP",
+    "timestamp": "2026-02-02T09:30:00Z",
+    "channel": "faster_payment",
+    "jurisdiction": "GB",
+    "sar_linked": "false"
+  }
+]

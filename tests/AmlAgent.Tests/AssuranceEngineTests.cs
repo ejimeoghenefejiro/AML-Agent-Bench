@@ -258,4 +258,118 @@ public class AssuranceEngineTests
         Assert.Contains("f1", decision.NotEvaluatedDimensions);
         Assert.Contains("Audit completeness", decision.NotEvaluatedDimensions);
     }
+
+    // -- Case-level evidence integrity gate (Priority 6: distinguishes agent-level
+    // hallucination/fabricated-citation/missing-gold-evidence, already covered above
+    // via judge metrics, from case-level "was the evidence itself trustworthy") --
+
+    [Fact]
+    public void EvaluateCaseIntegrity_CaseNotPresent_ProducesNoReasons()
+    {
+        var assessment = AssuranceEngine.EvaluateCaseIntegrity(casePresent: false, invalidSourceEvidenceReferenceCount: 0, brokenCanonicalEvidenceLineageCount: 0);
+        Assert.False(assessment.Present);
+        Assert.Empty(assessment.Reasons);
+    }
+
+    [Fact]
+    public void EvaluateCaseIntegrity_CasePresentAndClean_ProducesNoReasons()
+    {
+        var assessment = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 0, brokenCanonicalEvidenceLineageCount: 0);
+        Assert.True(assessment.Present);
+        Assert.Empty(assessment.Reasons);
+    }
+
+    [Fact]
+    public void EvaluateCaseIntegrity_InvalidSourceEvidenceReference_ProducesDistinctCriticalReason()
+    {
+        var assessment = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 2, brokenCanonicalEvidenceLineageCount: 0);
+        var reason = Assert.Single(assessment.Reasons);
+        Assert.Equal("case_evidence_integrity.invalid_source_evidence_reference", reason.Metric);
+        Assert.Equal(2, reason.Actual);
+        Assert.Equal("critical", reason.Severity);
+    }
+
+    [Fact]
+    public void EvaluateCaseIntegrity_BrokenCanonicalEvidenceLineage_ProducesDistinctCriticalReason()
+    {
+        var assessment = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 0, brokenCanonicalEvidenceLineageCount: 1);
+        var reason = Assert.Single(assessment.Reasons);
+        Assert.Equal("case_evidence_integrity.broken_canonical_evidence_lineage", reason.Metric);
+        Assert.Equal(1, reason.Actual);
+        Assert.Equal("critical", reason.Severity);
+    }
+
+    [Fact]
+    public void EvaluateCaseIntegrity_BothFailureKinds_ProducesTwoDistinctReasons()
+    {
+        // The whole point of Priority 6: an invalid reference and a broken lineage
+        // are different failure kinds and must be individually visible, not merged
+        // into one generic "case has problems" flag.
+        var assessment = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 1, brokenCanonicalEvidenceLineageCount: 1);
+        Assert.Equal(2, assessment.Reasons.Count);
+        Assert.Contains(assessment.Reasons, r => r.Metric == "case_evidence_integrity.invalid_source_evidence_reference");
+        Assert.Contains(assessment.Reasons, r => r.Metric == "case_evidence_integrity.broken_canonical_evidence_lineage");
+    }
+
+    [Fact]
+    public void ApplyCaseIntegrityGate_NoCaseReasons_LeavesDecisionUntouched()
+    {
+        var results = new[] { AssuranceEngine.EvaluateMetric(HigherIsBetter("f1", 0.90), 0.95) };
+        var decision = AssuranceEngine.Decide(results, Array.Empty<string>());
+        var clean = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 0, brokenCanonicalEvidenceLineageCount: 0);
+
+        var gated = AssuranceEngine.ApplyCaseIntegrityGate(decision, clean);
+
+        Assert.Equal(decision.Overall, gated.Overall);
+        Assert.Equal(decision.Reason, gated.Reason);
+        Assert.Equal(decision.Reasons.Count, gated.Reasons.Count);
+    }
+
+    [Fact]
+    public void ApplyCaseIntegrityGate_CaseIntegrityFailure_ForcesNotReadyForDeploymentEvenWithPassingMetrics()
+    {
+        // This is the core requirement: "a benchmark should not be considered
+        // assurance-valid if the underlying canonical case itself has unresolved
+        // evidence-integrity failures" -- regardless of how well the agent scored.
+        var results = new[] { AssuranceEngine.EvaluateMetric(HigherIsBetter("f1", 0.90), 1.0) };
+        var decision = AssuranceEngine.Decide(results, Array.Empty<string>());
+        Assert.Equal("PASS", decision.Overall);
+
+        var failing = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 1, brokenCanonicalEvidenceLineageCount: 0);
+        var gated = AssuranceEngine.ApplyCaseIntegrityGate(decision, failing);
+
+        Assert.Equal("NOT_READY_FOR_DEPLOYMENT", gated.Overall);
+        Assert.Contains(gated.Reasons, r => r.Metric == "case_evidence_integrity.invalid_source_evidence_reference");
+    }
+
+    [Fact]
+    public void ApplyCaseIntegrityGate_CaseIntegrityFailure_PreservesOriginalMetricReasonsToo()
+    {
+        // Transparency: gating to NOT_READY_FOR_DEPLOYMENT must not hide what the
+        // judge metrics themselves said -- both sets of reasons coexist.
+        var results = new[] { AssuranceEngine.EvaluateMetric(HigherIsBetter("f1", 0.90), 1.0) };
+        var decision = AssuranceEngine.Decide(results, Array.Empty<string>());
+        var failing = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 0, brokenCanonicalEvidenceLineageCount: 1);
+
+        var gated = AssuranceEngine.ApplyCaseIntegrityGate(decision, failing);
+
+        Assert.Equal(decision.Reasons.Count + 1, gated.Reasons.Count);
+    }
+
+    [Fact]
+    public void ApplyCaseIntegrityGate_AlreadyNotReadyForDeployment_KeepsOriginalReasonText()
+    {
+        // If the metrics already failed a required threshold, the case-integrity
+        // gate must not overwrite that explanation with its own -- both problems
+        // are real and the original reason stays primary.
+        var results = new[] { AssuranceEngine.EvaluateMetric(HigherIsBetter("f1", 0.90), 0.1) };
+        var decision = AssuranceEngine.Decide(results, Array.Empty<string>());
+        Assert.Equal("NOT_READY_FOR_DEPLOYMENT", decision.Overall);
+
+        var failing = AssuranceEngine.EvaluateCaseIntegrity(casePresent: true, invalidSourceEvidenceReferenceCount: 1, brokenCanonicalEvidenceLineageCount: 0);
+        var gated = AssuranceEngine.ApplyCaseIntegrityGate(decision, failing);
+
+        Assert.Equal(decision.Reason, gated.Reason);
+        Assert.Equal("NOT_READY_FOR_DEPLOYMENT", gated.Overall);
+    }
 }

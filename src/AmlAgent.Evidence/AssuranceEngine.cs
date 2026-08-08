@@ -125,7 +125,70 @@ public static class AssuranceEngine
             notEvaluated, reasons,
             "All defined policy metrics passed.");
     }
+
+    /// <summary>
+    /// Case-level evidence integrity (CanonicalCaseMerger/EvidenceIntegrityValidator's
+    /// output, surfaced via case_manifest.json) is a distinct question from the
+    /// judge-metric decision above: EGHR / fabricated citations / missing gold
+    /// evidence all ask "did the agent's report stay grounded in the evidence it
+    /// was given"; this asks "was the evidence itself trustworthy" -- independent
+    /// of anything the agent said. invalidSourceEvidenceReferenceCount covers
+    /// dangling/missing/wrong-typed references; brokenCanonicalEvidenceLineageCount
+    /// covers the same evidence id being contributed with conflicting content by
+    /// more than one source (no single authoritative lineage for it). A task with
+    /// no multi-source case (casePresent=false) produces no reasons at all -- no
+    /// behaviour change for tasks that never had a case_manifest.json.
+    /// </summary>
+    public static CaseIntegrityAssessment EvaluateCaseIntegrity(
+        bool casePresent,
+        int invalidSourceEvidenceReferenceCount,
+        int brokenCanonicalEvidenceLineageCount)
+    {
+        if (!casePresent)
+            return new CaseIntegrityAssessment(false, 0, 0, Array.Empty<DecisionReason>());
+
+        var reasons = new List<DecisionReason>();
+        if (invalidSourceEvidenceReferenceCount > 0)
+            reasons.Add(new DecisionReason("case_evidence_integrity.invalid_source_evidence_reference",
+                "Invalid source evidence reference", invalidSourceEvidenceReferenceCount, 0, "maximum", "critical"));
+        if (brokenCanonicalEvidenceLineageCount > 0)
+            reasons.Add(new DecisionReason("case_evidence_integrity.broken_canonical_evidence_lineage",
+                "Broken canonical evidence lineage", brokenCanonicalEvidenceLineageCount, 0, "maximum", "critical"));
+
+        return new CaseIntegrityAssessment(true, invalidSourceEvidenceReferenceCount, brokenCanonicalEvidenceLineageCount, reasons);
+    }
+
+    /// <summary>
+    /// Applies a case-integrity assessment on top of an already-computed
+    /// metric-based decision. Any case-integrity failure forces
+    /// NOT_READY_FOR_DEPLOYMENT, no matter how well the agent's report scored
+    /// on the judge metrics -- "a benchmark should not be considered
+    /// assurance-valid if the underlying canonical case itself has unresolved
+    /// evidence-integrity failures". A clean case (or no case at all) leaves
+    /// the original decision completely untouched.
+    /// </summary>
+    public static AssuranceDecision ApplyCaseIntegrityGate(AssuranceDecision decision, CaseIntegrityAssessment caseIntegrity)
+    {
+        if (caseIntegrity.Reasons.Count == 0)
+            return decision;
+
+        return decision with
+        {
+            Overall = "NOT_READY_FOR_DEPLOYMENT",
+            Reasons = decision.Reasons.Concat(caseIntegrity.Reasons).ToList(),
+            Reason = decision.Overall == "NOT_READY_FOR_DEPLOYMENT"
+                ? decision.Reason
+                : $"The underlying canonical case has unresolved evidence-integrity failures ({string.Join("; ", caseIntegrity.Reasons.Select(r => r.Label))}), independent of the judge's metrics above ({decision.Reason})",
+        };
+    }
 }
+
+/// <summary>Case-level evidence-integrity result, translated into assurance-decision reasons.</summary>
+public sealed record CaseIntegrityAssessment(
+    bool Present,
+    int InvalidSourceEvidenceReferenceCount,
+    int BrokenCanonicalEvidenceLineageCount,
+    IReadOnlyList<DecisionReason> Reasons);
 
 /// <summary>
 /// One threshold from an assurance policy (e.g. "EGHR &lt;= 5%").

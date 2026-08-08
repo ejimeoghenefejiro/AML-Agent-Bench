@@ -1,0 +1,23 @@
+{
+  "task": "task-007-multi-source-mule-network",
+  "description": "Gold evidence set and ground truth for the Evidence-Grounded Hallucination Rate (EGHR) and evidence-traceability metrics, plus this task's network/typology ground truth used by Task007MuleNetworkFindingsTests and manual review.",
+  "gold_evidence_txn_ids": [
+    "T1-001", "T1-002", "T1-003", "T1-004", "T2-001"
+  ],
+  "typology": "Authorised push payment (APP) fraud: an elderly victim is socially engineered into transferring funds to freshly-opened mule accounts, which rapidly layer the funds through an aggregator account before exiting to an offshore beneficiary in a high-risk jurisdiction.",
+  "victim_account_id": "N100",
+  "mule_account_ids": ["M201", "M202", "M301"],
+  "exit_account_id": "EXT401",
+  "watchlist_corroborated_account_id": "M301",
+  "innocent_account_ids": ["N150", "N160", "N170"],
+  "distractor_transaction_ids": ["T1-005", "T2-002"],
+  "expected_conclusions": [
+    "N100 is the victim of an authorised push payment fraud, not a suspect.",
+    "M201 and M202 are first-layer mule accounts that received the initial fraudulent transfers (T1-001, T1-002) and are both newly-opened accounts.",
+    "M301 is an aggregator account that received layered funds from both M201 (T1-003) and M202 (T1-004), and is independently corroborated by a prior SAR/watchlist flag from another institution.",
+    "EXT401 is the exit point: funds left M301 for an offshore beneficiary in a high-risk jurisdiction (AE) via T2-001.",
+    "N150 must be cleared: its only connection is a small, pre-existing recurring payment (T1-005) to M201 that predates any indication M201 was compromised, and is not part of the fraud's money flow.",
+    "N160 and N170 must be cleared: their transaction (T2-002) has no relationship-graph connection to the mule network at all and appears in the correspondent export only by incidental batch timing.",
+    "The case has a genuine cross-source merge conflict: the correspondent feed and the archive disagree on T2-001's timestamp (2026-02-02 vs 2026-02-05, a 3-day settlement-date discrepancy) -- a strong report notes this rather than silently picking one value."
+  ]
+}

@@ -34,30 +34,57 @@ public static class CanonicalHashing
         return "sha256:" + Convert.ToHexString(sha.Hash!).ToLowerInvariant();
     }
 
-    public static string ComputeNormalisationHash(CanonicalAmlDataset dataset)
+    public static string ComputeNormalisationHash(CanonicalAmlDataset dataset) => ComputeContentHash(
+        dataset.SchemaVersion, dataset.Transactions, dataset.Accounts, dataset.Customers, dataset.Entities,
+        dataset.Relationships, dataset.Cases, dataset.Alerts, dataset.Evidence, dataset.Jurisdictions, dataset.Sars);
+
+    /// <summary>
+    /// Hashes a merged CanonicalAmlCase the same way ComputeNormalisationHash hashes a
+    /// single dataset -- over the canonical record content only (Conflicts and
+    /// SourceManifest are merge-process metadata, not case content: if a source
+    /// changes in a way that matters, the kept record content already changes,
+    /// which this hash already reflects). Same case inputs -&gt; same hash; a
+    /// changed source -&gt; a changed hash.
+    /// </summary>
+    public static string ComputeCaseHash(CanonicalAmlCase amlCase) => ComputeContentHash(
+        amlCase.SchemaVersion, amlCase.Transactions, amlCase.Accounts, amlCase.Customers, amlCase.Entities,
+        amlCase.Relationships, amlCase.Cases, amlCase.Alerts, amlCase.Evidence, amlCase.Jurisdictions, amlCase.Sars);
+
+    private static string ComputeContentHash(
+        string schemaVersion,
+        IReadOnlyList<CanonicalTransaction> transactions,
+        IReadOnlyList<CanonicalAccount> accounts,
+        IReadOnlyList<CanonicalCustomer> customers,
+        IReadOnlyList<CanonicalEntity> entities,
+        IReadOnlyList<CanonicalRelationship> relationships,
+        IReadOnlyList<CanonicalCase> cases,
+        IReadOnlyList<CanonicalAlert> alerts,
+        IReadOnlyList<CanonicalEvidence> evidence,
+        IReadOnlyList<CanonicalJurisdiction> jurisdictions,
+        IReadOnlyList<CanonicalSar> sars)
     {
         var sb = new StringBuilder();
-        sb.Append("schema=").Append(dataset.SchemaVersion).Append(';');
+        sb.Append("schema=").Append(schemaVersion).Append(';');
 
-        AppendOrdered(sb, "txn", dataset.Transactions, t => t.TransactionId, t =>
+        AppendOrdered(sb, "txn", transactions, t => t.TransactionId, t =>
             $"{t.TransactionId}|{t.SourceAccount}|{t.DestinationAccount}|{t.Amount}|{t.Currency}|{t.Timestamp:O}|{t.Channel}|{t.Jurisdiction}|{t.SarLinked}");
-        AppendOrdered(sb, "acct", dataset.Accounts, a => a.AccountId, a =>
+        AppendOrdered(sb, "acct", accounts, a => a.AccountId, a =>
             $"{a.AccountId}|{a.Owner}|{a.Institution}|{a.Currency}");
-        AppendOrdered(sb, "cust", dataset.Customers, c => c.CustomerId, c =>
+        AppendOrdered(sb, "cust", customers, c => c.CustomerId, c =>
             $"{c.CustomerId}|{c.Name}|{c.RiskRating}|{c.Jurisdiction}");
-        AppendOrdered(sb, "ent", dataset.Entities, e => e.EntityId, e =>
+        AppendOrdered(sb, "ent", entities, e => e.EntityId, e =>
             $"{e.EntityId}|{e.EntityType}|{e.DisplayName}");
-        AppendOrdered(sb, "rel", dataset.Relationships, r => r.RelationshipId, r =>
+        AppendOrdered(sb, "rel", relationships, r => r.RelationshipId, r =>
             $"{r.RelationshipId}|{r.SourceEntityId}|{r.TargetEntityId}|{r.RelationshipType}|{string.Join(',', r.EvidenceIds.OrderBy(x => x, StringComparer.Ordinal))}");
-        AppendOrdered(sb, "case", dataset.Cases, c => c.CaseId, c =>
+        AppendOrdered(sb, "case", cases, c => c.CaseId, c =>
             $"{c.CaseId}|{c.Title}|{c.Status}");
-        AppendOrdered(sb, "alert", dataset.Alerts, a => a.AlertId, a =>
+        AppendOrdered(sb, "alert", alerts, a => a.AlertId, a =>
             $"{a.AlertId}|{a.CaseId}|{a.Typology}|{a.Severity}");
-        AppendOrdered(sb, "evid", dataset.Evidence, e => e.EvidenceId, e =>
+        AppendOrdered(sb, "evid", evidence, e => e.EvidenceId, e =>
             $"{e.EvidenceId}|{e.EvidenceType}|{e.Description}|{string.Join(',', e.RelatedRecordIds.OrderBy(x => x, StringComparer.Ordinal))}");
-        AppendOrdered(sb, "juris", dataset.Jurisdictions, j => j.Code, j =>
+        AppendOrdered(sb, "juris", jurisdictions, j => j.Code, j =>
             $"{j.Code}|{j.Name}|{j.HighRisk}");
-        AppendOrdered(sb, "sar", dataset.Sars, s => s.SarId, s =>
+        AppendOrdered(sb, "sar", sars, s => s.SarId, s =>
             $"{s.SarId}|{s.CaseId}|{string.Join(',', s.TransactionIds.OrderBy(x => x, StringComparer.Ordinal))}|{s.Narrative}");
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));

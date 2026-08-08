@@ -1,0 +1,11 @@
+{
+  "description": "Operational capabilities this task actually exercises, per the CLI-Only Assurance Roadmap's capability-tagging concept. Not every capability in the roadmap's illustrative list applies to every task; this file declares only the ones this specific task tests.",
+  "operational_capabilities": [
+    "multi_source_case_reasoning",
+    "cross_source_provenance_awareness",
+    "mule_network_reconstruction",
+    "evidence_based_case_reasoning",
+    "innocent_entity_exclusion",
+    "watchlist_corroboration"
+  ]
+}
