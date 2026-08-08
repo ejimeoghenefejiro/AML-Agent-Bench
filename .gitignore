@@ -49,6 +49,11 @@ results/*.json
 # per-run profiles are ignored.
 assurance-profiles/*.json
 
+# Machine-readable output of `aml-harness compare` / `regress` -- written to
+# the current working directory each invocation, ephemeral like the above.
+comparison_result.json
+regression_result.json
+
 # Third-party submissions — keep the directory and its README but ignore
 # everyone else's agent code by default. Our own reference baselines are
 # explicit exceptions so they ship with the bench.

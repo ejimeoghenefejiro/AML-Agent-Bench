@@ -53,6 +53,65 @@ documents' near-term items, nothing beyond them.
   version, and SHA-256 hashes of the dataset and rubric used, so a decision
   can in principle be reproduced from what's recorded.
 
+## Comparing and tracking runs (`compare` / `regress`)
+
+`aml-harness compare <profile.json> <profile.json> ...` prints every run's
+agent, model, task, policy, task performance, EGHR, evidence-traceability
+precision/recall/F1, fabricated-citation count and assurance decision side
+by side, and also writes `comparison_result.json` (compared runs,
+comparable vs. excluded dimensions, warnings) for automation. It never
+fabricates a value for a `not_implemented` dimension — only the four
+metrics this benchmark actually measures ever appear.
+
+`aml-harness regress --baseline <p.json> --candidate <p.json>` diffs two
+profiles metric-by-metric with direction-aware better/worse labelling,
+lists any threshold that newly **failed** or newly **passed** between the
+two runs, and reports whether the deployment decision itself got worse
+(`ASSURANCE REGRESSION DETECTED`). Also writes `regression_result.json`.
+Exit code 1 on a detected regression, so it's usable as an automation gate
+without any CI/CD system existing yet.
+
+Both commands run `AmlAgent.Evidence.CompatibilityCheck` first and print a
+`WARNING` for any pair of runs that differ in task, policy id/version,
+benchmark version, dataset, or which dimensions are required — the
+comparison still runs, but is clearly labelled non-equivalent rather than
+silently presented as apples-to-apples.
+
+## Exit codes
+
+`aml-harness` (run mode): `0` completed + benchmark passed + assurance PASS
+(or no assurance profile applicable); `1` execution failure (agent process
+failed); `2` benchmark failure (xUnit/judge failed); `3` benchmark passed,
+`PASS_WITH_CONDITIONS`; `4` benchmark passed, `NOT_READY_FOR_DEPLOYMENT`;
+`5` invalid policy/configuration. `compare`/`regress`: `0` ok, `1`
+regression detected (`regress` only), `6` invalid comparison. Full table
+also printed by `--help`.
+
+## Schema validation and provenance
+
+Every generated profile is checked against
+`AmlAgent.Evidence.AssuranceProfileSchema` before it's written — required
+top-level fields, metric/decision/policy/provenance structure, valid
+status/decision enum values, and a well-formed `result_hash`. A profile
+that fails validation is rejected with every violation listed (not just the
+first), and — like a malformed policy — this does not take down an
+otherwise-successful benchmark run; it surfaces as exit code `5`.
+
+`provenance` records: run id, timestamps, execution mode, benchmark
+version, git commit SHA, policy id/version/file hash, dataset hash, rubric
+hash, a task fingerprint (hash of the task's prompt/rubric/evidence-
+annotations, standing in for a task version number that doesn't exist yet),
+a benchmark-config hash (task+model+steps+mode+policy in one fingerprint),
+model identifier, temperature, judge model/config, and the .NET
+runtime/OS. `agent_version` is honestly recorded as `"unversioned"` (no
+version scheme exists for in-repo agents yet) rather than omitted, and
+`random_seed` is recorded as `null` with an explicit note: OpenAI's `seed`
+parameter, where available, is documented by the provider as best-effort,
+not a determinism guarantee, so it is not wired up or claimed here. The
+`reproducibility_note` field states plainly what *is* deterministic
+(evidence scoring, traceability, policy evaluation, all hashes — unit
+tested) versus what isn't (the underlying LLM's own output).
+
 ## What this is not (read this before citing it anywhere)
 
 - **Not a certification.** Section 14 of the vision document is explicit

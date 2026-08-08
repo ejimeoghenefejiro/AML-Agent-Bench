@@ -94,6 +94,63 @@ public class AssuranceEngineTests
     }
 
     [Fact]
+    public void Decide_MultipleRequiredMetricsFail_AllListedInReason()
+    {
+        var eghr = new MetricThreshold("eghr_rate", "EGHR", "lower_is_better", 0.05, "rate", Required: true);
+        var trace = new MetricThreshold("evidence_traceability_f1", "Evidence Traceability F1", "higher_is_better", 0.90, "rate", Required: true);
+        var results = new[]
+        {
+            AssuranceEngine.EvaluateMetric(eghr, 0.40),
+            AssuranceEngine.EvaluateMetric(trace, 0.25),
+        };
+        var decision = AssuranceEngine.Decide(results, Array.Empty<string>());
+        Assert.Equal("NOT_READY_FOR_DEPLOYMENT", decision.Overall);
+        Assert.Equal(2, decision.Reasons.Count);
+        Assert.Contains("EGHR", decision.Reason);
+        Assert.Contains("Evidence Traceability F1", decision.Reason);
+    }
+
+    [Fact]
+    public void Decide_OneRequiredMetricMissingAmongOthersPresent_DoesNotSilentlyPass()
+    {
+        var present = HigherIsBetter("f1", 0.90);
+        var missing = LowerIsBetter("eghr_rate", 0.05);
+        var results = new[]
+        {
+            AssuranceEngine.EvaluateMetric(present, 0.99),  // PASS
+            AssuranceEngine.EvaluateMetric(missing, null),  // NOT_EVALUATED
+        };
+        var decision = AssuranceEngine.Decide(results, Array.Empty<string>());
+        // A required metric with no data must never resolve to a bare PASS.
+        Assert.NotEqual("PASS", decision.Overall);
+        Assert.Contains("eghr_rate", decision.NotEvaluatedDimensions);
+    }
+
+    [Fact]
+    public void Decide_FabricatedCitationBreach_IsARequiredFailureThatBlocksDeployment()
+    {
+        var fabricated = new MetricThreshold("fabricated_citation_count", "Fabricated Citations", "lower_is_better", 0, "count", Required: true);
+        var results = new[] { AssuranceEngine.EvaluateMetric(fabricated, 1) }; // any fabrication at all
+        var decision = AssuranceEngine.Decide(results, Array.Empty<string>());
+        Assert.Equal("NOT_READY_FOR_DEPLOYMENT", decision.Overall);
+        Assert.Equal("critical", decision.Reasons[0].Severity);
+        Assert.Equal("Fabricated Citations", decision.Reasons[0].Label);
+    }
+
+    [Theory]
+    [InlineData(0.05, "PASS")]  // exactly at threshold, lower_is_better -> passes
+    [InlineData(0.0500001, "FAIL")] // a hair over -> fails
+    public void Decide_BoundaryValue_IsHandledConsistentlyWithEvaluateMetric(double value, string expectedMetricStatus)
+    {
+        var t = LowerIsBetter("eghr_rate", 0.05);
+        var result = AssuranceEngine.EvaluateMetric(t, value);
+        Assert.Equal(expectedMetricStatus, result.Status);
+
+        var decision = AssuranceEngine.Decide(new[] { result }, Array.Empty<string>());
+        Assert.Equal(expectedMetricStatus == "PASS" ? "PASS" : "NOT_READY_FOR_DEPLOYMENT", decision.Overall);
+    }
+
+    [Fact]
     public void Decide_RequiredMetricFailure_BlocksDeployment()
     {
         var required = new MetricThreshold("eghr", "EGHR", "lower_is_better", 0.05, "rate", Required: true);

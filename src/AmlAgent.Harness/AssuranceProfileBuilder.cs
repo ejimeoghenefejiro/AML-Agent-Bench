@@ -147,12 +147,47 @@ internal static class AssuranceProfileBuilder
                 ["git_commit_sha"] = GetGitCommitSha(repoRoot),
                 ["policy_id"] = (string?)policy["policy_id"],
                 ["policy_version"] = (string?)policy["policy_version"],
+                ["policy_file_hash"] = ComputeFileHash(policyPath),
                 ["dataset_hash"] = ComputeDatasetHash(repoRoot, task),
                 ["rubric_hash"] = ComputeFileHash(rubricPath),
+                ["task_fingerprint"] = ComputeTaskFingerprint(repoRoot, task),
+                ["benchmark_config_hash"] = ComputeBenchmarkConfigHash(task, benchResult, policy),
+
+                // Agent/model identity as configured. "agent_version" is
+                // honestly "unversioned" -- there is no version scheme for
+                // in-repo agents yet, recorded rather than omitted so the
+                // gap is visible.
+                ["agent_version"] = "unversioned",
+                ["model_identifier"] = benchResult["agent"]?["model"]?.DeepClone(),
+                ["temperature"] = 0.0, // hardcoded in BenchmarkAgent.cs / JudgeAgent.cs's OpenAIPromptExecutionSettings
+
+                // OpenAI's "seed" parameter (where available) is documented
+                // by the provider as best-effort, not a determinism
+                // guarantee -- it is deliberately NOT wired up or claimed
+                // here. Recording null (not omitting the field) makes the
+                // gap explicit rather than silently absent.
+                ["random_seed"] = null,
+
+                ["judge_model"] = judge["model"]?.DeepClone(),
+                ["judge_config"] = new JsonObject
+                {
+                    ["pass_threshold_overall"] = judge["pass_threshold_overall"]?.DeepClone(),
+                    ["rubric_path"] = Path.GetRelativePath(repoRoot, rubricPath).Replace('\\', '/'),
+                    ["temperature"] = 0.0,
+                },
+
+                ["runtime"] = new JsonObject
+                {
+                    ["dotnet_version"] = Environment.Version.ToString(),
+                    ["os"] = Environment.OSVersion.ToString(),
+                },
+
+                ["reproducibility_note"] = "Deterministic where the pipeline controls it (evidence scoring, traceability, policy evaluation, hashes) -- see AmlAgent.Evidence.EvidenceScoring/AssuranceEngine unit tests. NOT claimed deterministic for the underlying LLM's own output: OpenAI does not guarantee reproducible completions even at temperature 0 without a provider-guaranteed seed, which is not configured here (see random_seed).",
             },
         };
 
         profile["result_hash"] = ComputeHash(profile);
+        AssuranceProfileSchema.ValidateOrThrow(profile);
         return profile;
     }
 
@@ -244,6 +279,58 @@ internal static class AssuranceProfileBuilder
         }
         sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         return "sha256:" + Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// A stand-in for "task version": there is no explicit version field on
+    /// tasks yet, so this hashes everything that defines the task's actual
+    /// content (prompt/instruction text, rubric, gold-evidence annotations)
+    /// -- if any of those change, this fingerprint changes, which is the
+    /// practically useful property even without a human-assigned version
+    /// number.
+    /// </summary>
+    private static string? ComputeTaskFingerprint(string repoRoot, string task)
+    {
+        var taskDir = Path.Combine(repoRoot, "tasks", task);
+        if (!Directory.Exists(taskDir)) return null;
+
+        var candidates = new[] { "prompt.md", "instruction.md", "rubric.json", "evidence-annotations.json", "capabilities.json" };
+        var files = candidates
+            .Select(name => Path.Combine(taskDir, name))
+            .Where(File.Exists)
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToList();
+        if (files.Count == 0) return null;
+
+        using var sha = SHA256.Create();
+        foreach (var f in files)
+        {
+            var bytes = File.ReadAllBytes(f);
+            sha.TransformBlock(bytes, 0, bytes.Length, null, 0);
+        }
+        sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return "sha256:" + Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Hashes the run's own configuration (task, model, max steps, mode,
+    /// policy identity) into one fingerprint, so "was this run configured
+    /// the same way as that one" is a single string comparison.
+    /// </summary>
+    private static string ComputeBenchmarkConfigHash(string task, JsonObject benchResult, JsonObject policy)
+    {
+        var agent = benchResult["agent"]?.AsObject();
+        var canonical = string.Join('|', new[]
+        {
+            task,
+            (string?)agent?["model"] ?? "",
+            (string?)agent?["max_steps"]?.ToString() ?? "",
+            (string?)agent?["mode"] ?? "",
+            (string?)policy["policy_id"] ?? "",
+            (string?)policy["policy_version"] ?? "",
+        });
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
+        return "sha256:" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static string? GetGitCommitSha(string repoRoot)

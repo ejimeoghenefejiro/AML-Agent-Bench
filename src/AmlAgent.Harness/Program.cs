@@ -184,9 +184,11 @@ public static class Program
             var report = ReportBuilder.Build(workspace, repoRoot, meta, outcomes, trxPath);
             PrintSummaryTables(report);
 
+            JsonObject? assuranceProfile = null;
+            bool invalidPolicyOrConfig = false;
             try
             {
-                var assuranceProfile = AssuranceProfileBuilder.Build(report, workspace, repoRoot, policyPath);
+                assuranceProfile = AssuranceProfileBuilder.Build(report, workspace, repoRoot, policyPath);
                 if (assuranceProfile is not null)
                 {
                     AssuranceProfileBuilder.Write(assuranceProfile, workspace, repoRoot, task, meta.AgentName, startedUtc);
@@ -196,14 +198,17 @@ public static class Program
             catch (Exception ex)
             {
                 // A bad policy (malformed JSON, unknown direction, impossible
-                // threshold) must not silently produce a decision, but it
-                // also must not take down an otherwise-successful benchmark
-                // run -- the agent/judge/xUnit results above are still valid
-                // and already written.
+                // threshold) or a profile that fails schema validation must
+                // not silently produce a decision, but it also must not take
+                // down an otherwise-successful benchmark run -- the
+                // agent/judge/xUnit results above are still valid and
+                // already written.
                 Console.Error.WriteLine($"[harness] assurance profile rejected: {ex.Message}");
+                invalidPolicyOrConfig = true;
             }
 
-            var overall = (testRc == 0 && judgeRc == 0) ? 0 : 1;
+            var overall = ComputeExitCode(agentRc, testRc, judgeRc, invalidPolicyOrConfig, assuranceProfile);
+            PrintExitCodeExplanation(overall);
             return overall;
         }
         finally
@@ -211,6 +216,52 @@ public static class Program
             if (keepWorkspace) Console.WriteLine($"[harness] workspace kept: {workspace}");
             else SafeDelete(workspace);
         }
+    }
+
+    /// <summary>
+    /// Meaningful, documented exit codes (CLI-Only Assurance Roadmap item 9)
+    /// so the harness is usable as a CI/CD assurance gate:
+    ///   0 = completed, benchmark passed, assurance PASS (or no assurance profile to evaluate)
+    ///   1 = execution failure (the agent process itself failed)
+    ///   2 = benchmark failure (xUnit and/or judge failed)
+    ///   3 = benchmark passed, assurance PASS_WITH_CONDITIONS
+    ///   4 = benchmark passed, assurance NOT_READY_FOR_DEPLOYMENT
+    ///   5 = invalid policy/configuration (assurance profile could not be built/validated)
+    /// Checked in this priority order: a malformed policy (5) is reported
+    /// regardless of benchmark outcome since it means the requested
+    /// assurance evaluation itself couldn't run; execution failure (1) and
+    /// benchmark failure (2) take priority over the assurance decision
+    /// because there's no valid benchmark result to base an assurance
+    /// decision on in those cases.
+    /// </summary>
+    private static int ComputeExitCode(int agentRc, int xunitRc, int judgeRc, bool invalidPolicyOrConfig, JsonObject? assuranceProfile)
+    {
+        if (invalidPolicyOrConfig) return 5;
+        if (agentRc != 0) return 1;
+        if (xunitRc != 0 || judgeRc != 0) return 2;
+
+        var decision = (string?)assuranceProfile?["status_summary"]?["assurance_decision"];
+        return decision switch
+        {
+            "PASS_WITH_CONDITIONS" => 3,
+            "NOT_READY_FOR_DEPLOYMENT" => 4,
+            _ => 0, // PASS, or no assurance profile applicable (e.g. --oracle / --no-judge runs)
+        };
+    }
+
+    private static void PrintExitCodeExplanation(int code)
+    {
+        var meaning = code switch
+        {
+            0 => "completed, benchmark passed, assurance PASS (or no assurance profile applicable)",
+            1 => "execution failure -- the agent process itself failed",
+            2 => "benchmark failure -- xUnit and/or judge failed",
+            3 => "benchmark passed, assurance PASS_WITH_CONDITIONS",
+            4 => "benchmark passed, assurance NOT_READY_FOR_DEPLOYMENT",
+            5 => "invalid policy/configuration -- assurance profile could not be built",
+            _ => "unrecognised",
+        };
+        Console.WriteLine($"[harness] exit code {code}: {meaning}");
     }
 
     private static void PrintUsage()
@@ -240,6 +291,16 @@ public static class Program
         Console.WriteLine("  --local                  run the in-repo agent directly via `dotnet run` instead of Docker");
         Console.WriteLine("                           (only valid with --agent <name>; cannot combine with --agent-image / --submission)");
         Console.WriteLine("  --no-judge               skip the LLM-as-judge rubric stage");
+        Console.WriteLine();
+        Console.WriteLine("Exit codes (run mode):");
+        Console.WriteLine("  0  completed, benchmark passed, assurance PASS (or no assurance profile applicable)");
+        Console.WriteLine("  1  execution failure -- the agent process itself failed");
+        Console.WriteLine("  2  benchmark failure -- xUnit and/or judge failed");
+        Console.WriteLine("  3  benchmark passed, assurance PASS_WITH_CONDITIONS");
+        Console.WriteLine("  4  benchmark passed, assurance NOT_READY_FOR_DEPLOYMENT");
+        Console.WriteLine("  5  invalid policy/configuration -- assurance profile could not be built");
+        Console.WriteLine();
+        Console.WriteLine("Exit codes (compare/regress): 0 = ok, 1 = regression detected (regress only), 6 = invalid comparison");
     }
 
     /// <summary>
