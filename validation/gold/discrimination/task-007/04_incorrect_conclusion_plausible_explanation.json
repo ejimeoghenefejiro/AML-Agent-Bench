@@ -1,0 +1,15 @@
+{
+  "category": "incorrect_conclusion_plausible_explanation",
+  "quality_rank": 4,
+  "description": "Cites exactly the same real transactions as the perfect report but draws an incorrect conclusion -- a plausible-sounding alternative that the case evidence does not actually support.",
+  "report_text": "T1-001, T1-002, T1-003, T1-004 and T2-001 reflect legitimate high-value business banking activity between related corporate entities, not a fraud network.",
+  "claims": [
+    { "text": "The transfer chain reflects legitimate business banking, not fraud.", "cited_txn_ids": ["T1-001", "T1-002", "T1-003", "T1-004", "T2-001"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 5,
+    "missing_gold_citations_count": 0,
+    "unsupported_or_contradicted_claim_count": 0
+  },
+  "flag": "Same finding as validation/gold/discrimination/task-006/04: identical citation coverage to the perfect report, so EGHR and evidence-traceability score this fixture IDENTICALLY to fixture 01 despite the wrong conclusion. Only the LLM-judge's qualitative dimensions (task-007 rubric.json's network_identification / explanation_quality) could catch this, and that requires a live judge call not performed in this deterministic pass."
+}

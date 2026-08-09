@@ -1,0 +1,16 @@
+{
+  "scenario": "extrinsic_hallucination",
+  "description": "Per Ji et al. (2023), an extrinsic hallucination adds content that cannot be verified from the source at all -- neither confirmed nor contradicted by any real evidence. Represented as judge_support = 'unsupported' with no citation.",
+  "valid_txn_ids": ["T1-001"],
+  "claims": [
+    { "claim_id": "C1", "text": "N100 sent 15000 GBP to M201.", "cited_txn_ids": ["T1-001"], "judge_support": "supported" },
+    { "claim_id": "C2", "text": "M201 is believed to be run by an organised crime group operating across three countries.", "cited_txn_ids": [], "judge_support": "unsupported", "note": "Not present anywhere in the case evidence -- an invented elaboration, not a contradiction of any specific record." }
+  ],
+  "expected": {
+    "total_claims": 2,
+    "supported_count": 1,
+    "unsupported_count": 1,
+    "contradicted_count": 0,
+    "eghr_rate": 0.5
+  }
+}

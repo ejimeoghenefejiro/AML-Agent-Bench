@@ -1,0 +1,5 @@
+{
+  "description": "Real valid/gold transaction-id universe for task-007-multi-source-mule-network, taken directly from the merged canonical case (data/transactions_primary.csv + transactions_correspondent.json + transactions_archive.parquet) and evidence-annotations.json -- shared by every fixture in this directory.",
+  "valid_txn_ids": ["T1-001", "T1-002", "T1-003", "T1-004", "T1-005", "T2-001", "T2-002"],
+  "gold_txn_ids": ["T1-001", "T1-002", "T1-003", "T1-004", "T2-001"]
+}

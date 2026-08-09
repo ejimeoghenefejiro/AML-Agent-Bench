@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <graph id="G" edgedefault="directed">
+    <node id="ACC-ALPHA"><data key="label">Account</data><data key="name">Alpha</data></node>
+    <node id="ACC-BETA"><data key="label">Account</data><data key="name">Beta</data></node>
+    <node id="ACC-GAMMA"><data key="label">Account</data><data key="name">Gamma</data></node>
+    <node id="ACC-DELTA"><data key="label">Account</data><data key="name">Delta</data></node>
+    <edge id="REL-001" source="ACC-ALPHA" target="ACC-BETA"><data key="type">transferred_to</data><data key="evidence_ids">INV-001</data></edge>
+    <edge id="REL-002" source="ACC-BETA" target="ACC-GAMMA"><data key="type">transferred_to</data><data key="evidence_ids">INV-002</data></edge>
+    <edge id="REL-003" source="ACC-GAMMA" target="ACC-DELTA"><data key="type">transferred_to</data><data key="evidence_ids">INV-003</data></edge>
+  </graph>
+</graphml>

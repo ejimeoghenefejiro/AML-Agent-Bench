@@ -1,0 +1,13 @@
+{
+  "description": "Real valid/gold transaction-id universe for task-006-temporal-network-anomaly-detection, taken directly from environment/data/weekly_transfers.csv and evidence-annotations.json -- shared by every fixture in this directory.",
+  "valid_txn_ids": [
+    "T1-001", "T1-002", "T1-003", "T1-004", "T1-005", "T1-006", "T1-007", "T1-008", "T1-009", "T1-010",
+    "T2-001", "T2-002", "T2-003", "T2-004", "T2-005", "T2-006", "T2-007", "T2-008", "T2-009", "T2-010",
+    "T2-011", "T2-012", "T2-013", "T2-014", "T2-015", "T2-016",
+    "T3-001", "T3-002", "T3-003", "T3-004", "T3-005", "T3-006"
+  ],
+  "gold_txn_ids": [
+    "T2-003", "T2-006", "T2-008", "T2-010", "T2-012", "T2-014", "T2-016",
+    "T3-001", "T3-002", "T3-003", "T3-004", "T3-005", "T3-006"
+  ]
+}

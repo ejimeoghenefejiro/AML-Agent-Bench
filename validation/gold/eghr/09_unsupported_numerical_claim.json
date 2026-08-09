@@ -1,0 +1,15 @@
+{
+  "scenario": "unsupported_numerical_claim",
+  "description": "A specific, checkable numerical claim (an amount) that the cited evidence directly disproves -- a number hallucination, judged 'contradicted' since it is verifiably wrong against the citation given.",
+  "valid_txn_ids": ["T1-001"],
+  "claims": [
+    { "claim_id": "C1", "text": "N100 transferred 50000 GBP to M201.", "cited_txn_ids": ["T1-001"], "judge_support": "contradicted", "note": "T1-001 records 15000 GBP, not 50000 -- a fabricated numerical value attached to a real citation." }
+  ],
+  "expected": {
+    "total_claims": 1,
+    "supported_count": 0,
+    "unsupported_count": 0,
+    "contradicted_count": 1,
+    "eghr_rate": 1.0
+  }
+}

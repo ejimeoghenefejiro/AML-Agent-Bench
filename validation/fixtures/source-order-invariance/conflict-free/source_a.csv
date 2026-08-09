@@ -1,0 +1,3 @@
+transaction_id,source_account,destination_account,amount,currency,timestamp,channel,jurisdiction,sar_linked
+TA-001,ACC1,ACC2,1000.00,USD,2026-01-01T09:00:00Z,wire,US,false
+TA-002,ACC2,ACC3,2000.00,USD,2026-01-01T10:00:00Z,wire,US,false

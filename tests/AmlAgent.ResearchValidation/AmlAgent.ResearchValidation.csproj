@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AmlAgent.ResearchValidation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AmlAgent.Evidence\AmlAgent.Evidence.csproj" />
+    <ProjectReference Include="..\..\src\AmlAgent.Adapters\AmlAgent.Adapters.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- validation/ fixtures and gold data are read at test time, not compiled;
+         copy them alongside the test binaries so relative-path lookups work under `dotnet test`. -->
+    <None Include="..\..\validation\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="validation" />
+  </ItemGroup>
+
+</Project>

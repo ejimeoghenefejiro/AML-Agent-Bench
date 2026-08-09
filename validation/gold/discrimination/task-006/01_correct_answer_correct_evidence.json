@@ -1,0 +1,15 @@
+{
+  "category": "correct_answer_correct_evidence",
+  "quality_rank": 1,
+  "description": "Every gold-relevant transaction is cited, every claim is grounded, nothing fabricated. The best possible report for this case.",
+  "report_text": "Week 2 shows a spike through new intermediaries, evidenced by T2-003, T2-006, T2-008, T2-010, T2-012, T2-014, T2-016. Week 3 shows exit to high-risk jurisdictions via T3-001, T3-002, T3-003, T3-004, T3-005, T3-006.",
+  "claims": [
+    { "text": "New intermediary accounts receive layered funds in week 2.", "cited_txn_ids": ["T2-003", "T2-006", "T2-008", "T2-010", "T2-012", "T2-014", "T2-016"], "judge_support": "supported" },
+    { "text": "Funds exit to high-risk jurisdictions in week 3.", "cited_txn_ids": ["T3-001", "T3-002", "T3-003", "T3-004", "T3-005", "T3-006"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 13,
+    "missing_gold_citations_count": 0,
+    "unsupported_or_contradicted_claim_count": 0
+  }
+}

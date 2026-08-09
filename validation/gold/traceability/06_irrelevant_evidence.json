@@ -1,0 +1,15 @@
+{
+  "scenario": "irrelevant_evidence",
+  "description": "Report cites two real transactions, neither of which is gold-relevant -- both precision and recall are zero, but f1 is undefined (not 0) since precision + recall = 0.",
+  "report_text": "Also of note: T1-002 and T1-003.",
+  "valid_txn_ids": ["T1-001", "T1-002", "T1-003"],
+  "gold_txn_ids": ["T1-001"],
+  "expected": {
+    "cited_total": 2, "cited_distinct": 2,
+    "fabricated_citations": [],
+    "grounded_distinct": 2,
+    "gold_total": 1, "matched_gold_citations": 0, "missing_gold_citations_list": ["T1-001"],
+    "precision": 0.0, "recall": 0.0, "f1": null
+  },
+  "flag": "F1 is null here, not 0.0, because ComputeTraceability only computes F1 when precision + recall > 0 (guards a 0/0 division). Both precision and recall are well-defined 0.0 individually, but their harmonic mean is left undefined rather than reported as 0. A consumer that treats a null F1 as 'not evaluated' rather than 'evaluated as zero' would need to check precision/recall directly to catch this specific complete-miss case."
+}

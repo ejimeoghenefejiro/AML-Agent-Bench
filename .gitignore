@@ -54,6 +54,13 @@ assurance-profiles/*.json
 comparison_result.json
 regression_result.json
 
+# Raw results from research-validation experiments (repeated-run,
+# judge-repeatability, noise/distractor, false-positive) -- regenerable, not
+# source. validation/fixtures, validation/gold and validation/experiments
+# (the inputs/config) are tracked; only validation/outputs (the results) is not.
+validation/outputs/*
+!validation/outputs/.gitkeep
+
 # Third-party submissions — keep the directory and its README but ignore
 # everyone else's agent code by default. Our own reference baselines are
 # explicit exceptions so they ship with the bench.

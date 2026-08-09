@@ -1,0 +1,17 @@
+{
+  "category": "unsupported_claim_hallucination",
+  "quality_rank": 5,
+  "description": "Cites a reasonable subset of real gold evidence (8 of 13), but also makes two invented claims with no supporting citation at all -- extrinsic hallucination layered on top of otherwise-real grounding.",
+  "report_text": "Week 2 shows a spike through new intermediaries, evidenced by T2-003, T2-006, T2-008, T2-010. Week 3 shows exit to high-risk jurisdictions via T3-001, T3-002, T3-003, T3-004.",
+  "claims": [
+    { "text": "New intermediary accounts receive layered funds in week 2.", "cited_txn_ids": ["T2-003", "T2-006", "T2-008", "T2-010"], "judge_support": "supported" },
+    { "text": "Funds exit to high-risk jurisdictions in week 3.", "cited_txn_ids": ["T3-001", "T3-002", "T3-003", "T3-004"], "judge_support": "supported" },
+    { "text": "The same network was previously investigated by a different regulator.", "cited_txn_ids": [], "judge_support": "unsupported" },
+    { "text": "X003 is believed to be a front for an organised crime group.", "cited_txn_ids": [], "judge_support": "unsupported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 8,
+    "missing_gold_citations_count": 5,
+    "unsupported_or_contradicted_claim_count": 2
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "scenario": "intrinsic_hallucination",
+  "description": "Per Ji et al. (2023), an intrinsic hallucination directly contradicts the source content -- the report states something the cited evidence actually disproves. Represented as judge_support = 'contradicted'.",
+  "valid_txn_ids": ["T1-001"],
+  "claims": [
+    { "claim_id": "C1", "text": "T1-001 shows N100 sent 5000 GBP to M201.", "cited_txn_ids": ["T1-001"], "judge_support": "contradicted", "note": "T1-001 actually records 15000 GBP, not 5000 -- the claim contradicts its own cited evidence." }
+  ],
+  "expected": {
+    "total_claims": 1,
+    "supported_count": 0,
+    "unsupported_count": 0,
+    "contradicted_count": 1,
+    "eghr_rate": 1.0
+  }
+}

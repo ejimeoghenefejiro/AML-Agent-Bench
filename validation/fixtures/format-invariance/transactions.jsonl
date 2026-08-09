@@ -1,0 +1,3 @@
+{"transaction_id": "INV-001", "source_account": "ACC-ALPHA", "destination_account": "ACC-BETA", "amount": "12345.67", "currency": "GBP", "timestamp": "2026-03-15T14:30:00Z", "channel": "wire", "jurisdiction": "GB", "sar_linked": "true"}
+{"transaction_id": "INV-002", "source_account": "ACC-BETA", "destination_account": "ACC-GAMMA", "amount": "999.99", "currency": "EUR", "timestamp": "2026-03-16T08:15:30Z", "channel": "ach", "jurisdiction": "DE", "sar_linked": "false"}
+{"transaction_id": "INV-003", "source_account": "ACC-GAMMA", "destination_account": "ACC-DELTA", "amount": "50000.00", "currency": "USD", "timestamp": "2026-03-17T23:59:59Z", "channel": "swift", "jurisdiction": "US", "sar_linked": "true"}

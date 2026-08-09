@@ -1,0 +1,15 @@
+{
+  "scenario": "contradictory_evidence",
+  "description": "The underlying case data itself contains two records that disagree (e.g. a cross-source merge conflict on a transaction's amount/timestamp -- see CanonicalCaseMerger). A claim that asserts one side of the conflict as settled fact, when the case's own provenance shows it is disputed, should be judged 'contradicted', not 'supported'.",
+  "valid_txn_ids": ["T2-001"],
+  "claims": [
+    { "claim_id": "C1", "text": "The exit transfer T2-001 was settled on 2026-02-02, confirming same-day exfiltration.", "cited_txn_ids": ["T2-001"], "judge_support": "contradicted", "note": "case_manifest.json records a genuine cross-source merge conflict on T2-001's timestamp (2026-02-02 vs 2026-02-05) -- asserting one value as settled fact, without acknowledging the conflict, contradicts the case's own recorded provenance." }
+  ],
+  "expected": {
+    "total_claims": 1,
+    "supported_count": 0,
+    "unsupported_count": 0,
+    "contradicted_count": 1,
+    "eghr_rate": 1.0
+  }
+}

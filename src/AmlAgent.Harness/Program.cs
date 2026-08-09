@@ -42,6 +42,20 @@ public static class Program
             return LoadDatasetCommand.Run(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "load-case")
             return LoadCaseCommand.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "experiment")
+        {
+            var sub = args.Length > 1 ? args[1] : null;
+            var rest = args.Skip(2).ToArray();
+            switch (sub)
+            {
+                case "repeat": return ExperimentRepeatCommand.Run(rest);
+                case "judge-repeat": return ExperimentJudgeRepeatCommand.Run(rest);
+                default:
+                    Console.WriteLine("aml-harness experiment repeat --task <id> [options]        repeated agent+judge runs (research-validation item 6)");
+                    Console.WriteLine("aml-harness experiment judge-repeat --workspace <p> --task <id> [options]   LLM-judge repeatability (item 7)");
+                    return sub is null or "-h" or "--help" ? 0 : 64;
+            }
+        }
 
         var envFile = DotEnv.Load();
         if (envFile is not null)
@@ -283,6 +297,8 @@ public static class Program
         Console.WriteLine("  aml-harness regress --baseline <p.json> --candidate <p.json>   detect an assurance regression");
         Console.WriteLine("  aml-harness load-dataset --source-type <type> [options]        load a dataset via the adapter layer, write dataset_manifest.json");
         Console.WriteLine("  aml-harness load-case --case <case-definition.json>            load+merge a multi-source case, write case_manifest.json");
+        Console.WriteLine("  aml-harness experiment repeat --task <id> [--runs N]           repeated agent+judge runs, raw per-run measurements");
+        Console.WriteLine("  aml-harness experiment judge-repeat --workspace <p> --task <id> [--runs N]   LLM-judge repeatability on a fixed output");
         Console.WriteLine();
         Console.WriteLine("Agent source (pick one):");
         Console.WriteLine("  --agent <name>           subfolder of agents/ in this repo (default: csharp-sk)");
@@ -544,7 +560,7 @@ public static class Program
     /// `docker run -e OPENAI_API_KEY=...` — never print credentials to the
     /// console or any captured log/transcript.
     /// </summary>
-    private static string RedactForLog(string arg)
+    internal static string RedactForLog(string arg)
     {
         var eq = arg.IndexOf('=');
         if (eq <= 0) return arg;
@@ -1033,7 +1049,7 @@ public static class Program
     private static void PrintTableRow(string[] cells, int[] widths) =>
         Console.WriteLine(string.Join(" | ", cells.Select((c, i) => c.PadRight(widths[i]))));
 
-    private static string? FindRepoRoot()
+    internal static string? FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)

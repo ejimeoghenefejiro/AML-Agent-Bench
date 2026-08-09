@@ -1,0 +1,15 @@
+{
+  "scenario": "correct_record_incorrect_conclusion",
+  "description": "The report cites the correct, gold-relevant transaction (perfect traceability) but draws a wrong conclusion from it.",
+  "report_text": "T1-001 confirms this was a routine internal payroll transfer, not part of any fraud.",
+  "valid_txn_ids": ["T1-001"],
+  "gold_txn_ids": ["T1-001"],
+  "expected": {
+    "cited_total": 1, "cited_distinct": 1,
+    "fabricated_citations": [],
+    "grounded_distinct": 1,
+    "gold_total": 1, "matched_gold_citations": 1, "missing_gold_citations_list": [],
+    "precision": 1.0, "recall": 1.0, "f1": 1.0
+  },
+  "flag": "This is a genuine scope limitation, not an implementation bug: evidence-traceability (precision/recall/F1) measures whether a citation points at a real, gold-relevant record -- it says nothing about whether the CONCLUSION drawn from that record is correct. Here the report is perfectly traceable (1.0/1.0/1.0) while asserting a conclusion the underlying case data does not support (T1-001 is in fact a fraud-chain transfer, not payroll). Catching a correctly-cited-but-wrongly-interpreted claim requires the qualitative judge dimensions (e.g. network_identification, typology in task-007's rubric.json), not the deterministic traceability metrics. Evidence traceability is a necessary but not sufficient signal for report correctness -- this should be stated explicitly in any methodology writeup that cites traceability scores as evidence of report quality."
+}

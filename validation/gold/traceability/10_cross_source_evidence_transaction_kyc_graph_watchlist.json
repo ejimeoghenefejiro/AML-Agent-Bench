@@ -1,0 +1,15 @@
+{
+  "scenario": "cross_source_evidence_transaction_kyc_graph_watchlist",
+  "description": "Report cites evidence from three different sources: a transaction (T1-001), a relationship-graph edge (R1), and a watchlist entity (WATCHLIST1) -- exactly the kind of cross-source grounding the multi-source case architecture (task-007) is meant to support.",
+  "report_text": "N100 sent funds to M201 (T1-001), an edge confirmed in the relationship graph (R1), and M301 is independently corroborated by a prior watchlist flag (WATCHLIST1).",
+  "valid_txn_ids": ["T1-001"],
+  "gold_txn_ids": ["T1-001"],
+  "expected": {
+    "cited_total": 1, "cited_distinct": 1,
+    "fabricated_citations": [],
+    "grounded_distinct": 1,
+    "gold_total": 1, "matched_gold_citations": 1, "missing_gold_citations_list": [],
+    "precision": 1.0, "recall": 1.0, "f1": 1.0
+  },
+  "flag": "MAJOR SCOPE FINDING, not a bug to silently fix here: AmlAgent.Evidence.EvidenceScoring.ExtractCitedTxnIds uses the fixed regex \\bT[123]-\\d{3}\\b, which only recognises transaction-id-shaped tokens. The relationship id 'R1' and the watchlist entity id 'WATCHLIST1' in this report are completely invisible to cited_total/cited_distinct/grounded/fabricated_citations -- despite the report genuinely citing them as supporting evidence. Concretely: (1) a report that correctly grounds a claim in relationship/watchlist evidence receives IDENTICAL traceability scores to a report that never mentioned that evidence at all -- there is no positive credit for cross-source grounding; (2) a report that FABRICATES a relationship id (e.g. cites a non-existent 'R99') would likewise never appear in fabricated_citations -- cross-source evidence fabrication currently goes completely undetected by this metric, unlike transaction-id fabrication. This means the current evidence-traceability implementation only actually validates transaction-shaped evidence; its 'evidence traceability' claim does not yet extend to entity/relationship/watchlist/SAR evidence from the canonical multi-source model, even though CanonicalRelationship.EvidenceIds and the case-integrity layer (EvidenceIntegrityValidator) already model and validate exactly that kind of reference at the DATA layer. Closing this gap (extending citation extraction to recognise canonical non-transaction record ids, e.g. relationship/entity/SAR id shapes) is a real, scoped follow-up for evidence-traceability to genuinely cover multi-source cases; it is deliberately not fixed in this validation pass, per the instruction to flag definitional gaps rather than silently patch around them."
+}

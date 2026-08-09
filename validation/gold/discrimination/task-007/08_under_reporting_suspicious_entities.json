@@ -1,0 +1,19 @@
+{
+  "category": "under_reporting_suspicious_entities",
+  "quality_rank": 8,
+  "description": "Entity-classification failure (measured the same way as fixture 07): correctly identifies the victim, both first-layer mules, and the exit account, and correctly clears all three innocent accounts, but misses the aggregator account (M301) entirely -- classifying it as cleared instead of mule.",
+  "findings": [
+    { "account_id": "N100", "classification": "victim" },
+    { "account_id": "M201", "classification": "mule" },
+    { "account_id": "M202", "classification": "mule" },
+    { "account_id": "M301", "classification": "cleared" },
+    { "account_id": "EXT401", "classification": "exit_point" },
+    { "account_id": "N150", "classification": "cleared" },
+    { "account_id": "N160", "classification": "cleared" },
+    { "account_id": "N170", "classification": "cleared" }
+  ],
+  "expected_discrete": {
+    "false_positive_innocent_accounts": [],
+    "false_negative_suspicious_accounts": ["M301"]
+  }
+}

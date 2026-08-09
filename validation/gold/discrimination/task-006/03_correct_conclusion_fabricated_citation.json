@@ -1,0 +1,18 @@
+{
+  "category": "correct_conclusion_fabricated_citation",
+  "quality_rank": 3,
+  "description": "Cites every gold-relevant transaction (identical real-citation coverage to the perfect report) but pads the case with one additional, fabricated transaction id as if it were extra corroboration.",
+  "report_text": "Week 2 shows a spike through new intermediaries, evidenced by T2-003, T2-006, T2-008, T2-010, T2-012, T2-014, T2-016. Week 3 shows exit to high-risk jurisdictions via T3-001, T3-002, T3-003, T3-004, T3-005, T3-006. Additional corroborating activity is seen in T2-098.",
+  "claims": [
+    { "text": "New intermediary accounts receive layered funds in week 2.", "cited_txn_ids": ["T2-003", "T2-006", "T2-008", "T2-010", "T2-012", "T2-014", "T2-016"], "judge_support": "supported" },
+    { "text": "Funds exit to high-risk jurisdictions in week 3.", "cited_txn_ids": ["T3-001", "T3-002", "T3-003", "T3-004", "T3-005", "T3-006"], "judge_support": "supported" },
+    { "text": "Additional corroborating activity confirms the pattern.", "cited_txn_ids": ["T2-098"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 13,
+    "missing_gold_citations_count": 0,
+    "unsupported_or_contradicted_claim_count": 1,
+    "fabricated_citations": ["T2-098"]
+  },
+  "flag": "This report's real-citation coverage of the gold set is IDENTICAL to the perfect report (fixture 01) -- same 13 matched, same 0 missing. Evidence-traceability precision/recall/F1 will therefore score this fixture EXACTLY the same as the perfect one, because the fabricated citation is excluded from the traceability denominator entirely (see validation/gold/traceability/04_fabricated_evidence_ids.json). Only EGHR discriminates this fixture from the perfect one, via the claim that cited the fabricated id being deterministically forced to 'unsupported'. This is the concrete, task-006-grounded instance of that earlier finding."
+}

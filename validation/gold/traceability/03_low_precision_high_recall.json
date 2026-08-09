@@ -1,0 +1,14 @@
+{
+  "scenario": "low_precision_high_recall",
+  "description": "Report cites six real transaction ids, only two of which are gold-relevant -- catches all the gold evidence (recall 1.0) but buries it in irrelevant citations (precision 0.3333).",
+  "report_text": "Related activity: T1-001, T1-002, T1-003, T1-004, T1-005, T1-006.",
+  "valid_txn_ids": ["T1-001", "T1-002", "T1-003", "T1-004", "T1-005", "T1-006"],
+  "gold_txn_ids": ["T1-001", "T1-002"],
+  "expected": {
+    "cited_total": 6, "cited_distinct": 6,
+    "fabricated_citations": [],
+    "grounded_distinct": 6,
+    "gold_total": 2, "matched_gold_citations": 2, "missing_gold_citations_list": [],
+    "precision": 0.3333, "recall": 1.0, "f1": 0.5
+  }
+}

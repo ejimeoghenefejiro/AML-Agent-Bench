@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using AmlAgent.Adapters.Canonical;
@@ -67,7 +68,7 @@ public static class CanonicalHashing
         sb.Append("schema=").Append(schemaVersion).Append(';');
 
         AppendOrdered(sb, "txn", transactions, t => t.TransactionId, t =>
-            $"{t.TransactionId}|{t.SourceAccount}|{t.DestinationAccount}|{t.Amount}|{t.Currency}|{t.Timestamp:O}|{t.Channel}|{t.Jurisdiction}|{t.SarLinked}");
+            $"{t.TransactionId}|{t.SourceAccount}|{t.DestinationAccount}|{NormaliseDecimal(t.Amount)}|{t.Currency}|{t.Timestamp:O}|{t.Channel}|{t.Jurisdiction}|{t.SarLinked}");
         AppendOrdered(sb, "acct", accounts, a => a.AccountId, a =>
             $"{a.AccountId}|{a.Owner}|{a.Institution}|{a.Currency}");
         AppendOrdered(sb, "cust", customers, c => c.CustomerId, c =>
@@ -97,5 +98,26 @@ public static class CanonicalHashing
         foreach (var item in items.OrderBy(keySelector, StringComparer.Ordinal))
             sb.Append(serialise(item)).Append(';');
         sb.Append('|');
+    }
+
+    /// <summary>
+    /// A bare decimal.ToString() is scale-preserving, not value-normalised: 50000.00m
+    /// and 50000m are the same logical amount (decimal equality treats them as equal)
+    /// but format as different strings ("50000.00" vs "50000"). That distinction is
+    /// invisible in CSV/JSON, which parse whatever scale the text happened to use,
+    /// but Parquet's decimal physical type imposes its own fixed column scale on
+    /// write/read -- so the identical logical amount can round-trip through Parquet
+    /// with a different scale than it had coming from CSV, silently breaking
+    /// "the same logical dataset always hashes the same way" for reasons that have
+    /// nothing to do with the data actually differing. Strips trailing fractional
+    /// zeros (and a bare trailing '.') so the hash reflects the value, not its
+    /// source format's incidental scale.
+    /// </summary>
+    private static string NormaliseDecimal(decimal value)
+    {
+        var s = value.ToString(CultureInfo.InvariantCulture);
+        if (!s.Contains('.')) return s;
+        s = s.TrimEnd('0');
+        return s.EndsWith('.') ? s[..^1] : s;
     }
 }

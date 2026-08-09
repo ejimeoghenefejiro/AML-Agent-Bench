@@ -1,0 +1,19 @@
+{
+  "category": "correct_conclusion_fabricated_citation",
+  "quality_rank": 3,
+  "description": "Cites every gold-relevant transaction (identical real-citation coverage to the perfect report) but adds one fabricated transaction id as padding.",
+  "report_text": "N100 sent funds to M201 (T1-001) and M202 (T1-002). Both forwarded to M301 (T1-003, T1-004), which sent funds offshore (T2-001). Further corroborating activity is seen in T1-099.",
+  "claims": [
+    { "text": "N100 sent funds to both first-layer mules.", "cited_txn_ids": ["T1-001", "T1-002"], "judge_support": "supported" },
+    { "text": "Both first-layer mules forwarded funds to the aggregator.", "cited_txn_ids": ["T1-003", "T1-004"], "judge_support": "supported" },
+    { "text": "The aggregator sent funds offshore.", "cited_txn_ids": ["T2-001"], "judge_support": "supported" },
+    { "text": "Further corroborating activity confirms the pattern.", "cited_txn_ids": ["T1-099"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 5,
+    "missing_gold_citations_count": 0,
+    "unsupported_or_contradicted_claim_count": 1,
+    "fabricated_citations": ["T1-099"]
+  },
+  "flag": "Same real-citation coverage as the perfect report -- traceability precision/recall/F1 will be identical to fixture 01. Only EGHR discriminates this fixture, via the claim that cited the fabricated id being forced to 'unsupported'."
+}

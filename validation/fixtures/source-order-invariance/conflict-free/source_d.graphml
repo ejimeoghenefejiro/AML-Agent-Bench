@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <graph id="G" edgedefault="directed">
+    <node id="ACC1"><data key="label">Account</data><data key="name">Account 1</data></node>
+    <node id="ACC2"><data key="label">Account</data><data key="name">Account 2</data></node>
+    <edge id="RA-001" source="ACC1" target="ACC2"><data key="type">transferred_to</data><data key="evidence_ids">TA-001</data></edge>
+  </graph>
+</graphml>

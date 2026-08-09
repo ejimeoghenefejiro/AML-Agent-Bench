@@ -1,0 +1,20 @@
+{
+  "scenario": "multiple_unsupported_claims",
+  "description": "Five claims, three unsupported (mix of no-citation and fabricated-citation). EGHR must be exactly 3/5.",
+  "valid_txn_ids": ["T1-001", "T1-002"],
+  "claims": [
+    { "claim_id": "C1", "text": "N100 sent 15000 GBP to M201.", "cited_txn_ids": ["T1-001"], "judge_support": "supported" },
+    { "claim_id": "C2", "text": "N100 sent 12000 GBP to M202.", "cited_txn_ids": ["T1-002"], "judge_support": "supported" },
+    { "claim_id": "C3", "text": "M201 has been used in prior fraud cases.", "cited_txn_ids": [], "judge_support": "unsupported" },
+    { "claim_id": "C4", "text": "M201 is owned by a shell company in Cyprus.", "cited_txn_ids": ["T9-999"], "judge_support": "supported" },
+    { "claim_id": "C5", "text": "The victim has reported similar fraud before.", "cited_txn_ids": [], "judge_support": "unsupported" }
+  ],
+  "expected": {
+    "total_claims": 5,
+    "supported_count": 2,
+    "unsupported_count": 3,
+    "contradicted_count": 0,
+    "eghr_rate": 0.6,
+    "notes": "C4 cites a fabricated id (T9-999, not in valid_txn_ids) so the deterministic backstop overrides the judge's 'supported' label to 'unsupported', regardless of whether the underlying claim happens to be true."
+  }
+}

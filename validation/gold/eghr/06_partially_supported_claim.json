@@ -1,0 +1,16 @@
+{
+  "scenario": "partially_supported_claim",
+  "description": "A claim that is half-right: one part of the statement is grounded in real evidence, another part is not. The current EvidenceScoring API has no 'partially_supported' category -- ClaimInput.Support only recognises exactly 'supported' or 'contradicted'; anything else (including a genuinely partial label like 'partially_supported') collapses to 'unsupported'.",
+  "valid_txn_ids": ["T1-001"],
+  "claims": [
+    { "claim_id": "C1", "text": "N100 sent 15000 GBP to M201 as part of a three-account layering chain.", "cited_txn_ids": ["T1-001"], "judge_support": "partially_supported", "note": "T1-001 confirms the 15000 GBP transfer to M201, but nothing in the evidence establishes a 'three-account layering chain' -- the claim is half-grounded, half-invented." }
+  ],
+  "expected": {
+    "total_claims": 1,
+    "supported_count": 0,
+    "unsupported_count": 1,
+    "contradicted_count": 0,
+    "eghr_rate": 1.0
+  },
+  "flag": "SCIENTIFIC DEFINITION TENDS TO CONFLICT WITH IMPLEMENTATION: EGHR as implemented is binary per claim (supported vs. counts-as-hallucination); it has no mechanism for partial credit or a distinct 'partially supported' bucket, and any non-canonical support label is silently coerced to 'unsupported' rather than rejected or separately counted. A partially-grounded claim scores identically to a fully-fabricated one. This may be scientifically defensible (claim-level atomicity is supposed to prevent this by decomposing to single-fact claims upstream, in which case a truly atomic claim should never legitimately be 'half right'), but the coercion is currently silent -- EvidenceScoring.ScoreClaims does not surface a warning or distinct count when it receives an out-of-vocabulary support label. Recommend either enforcing atomic-claim decomposition strictly upstream (so this case cannot arise) or adding an explicit 'malformed_support_label' counter distinct from genuine extrinsic hallucination, so the two failure modes are not conflated in reported EGHR."
+}

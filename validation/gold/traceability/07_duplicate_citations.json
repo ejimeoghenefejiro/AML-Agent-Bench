@@ -1,0 +1,14 @@
+{
+  "scenario": "duplicate_citations",
+  "description": "The same gold-relevant transaction is cited five times in the same report. cited_total reflects the repetition; precision/recall/F1 must not be inflated or deflated by it since they operate on the distinct set.",
+  "report_text": "T1-001 shows the transfer. T1-001 is the key evidence. As T1-001 confirms, funds moved on this date. Note again T1-001. Final reference: T1-001.",
+  "valid_txn_ids": ["T1-001", "T1-002"],
+  "gold_txn_ids": ["T1-001"],
+  "expected": {
+    "cited_total": 5, "cited_distinct": 1,
+    "fabricated_citations": [],
+    "grounded_distinct": 1,
+    "gold_total": 1, "matched_gold_citations": 1, "missing_gold_citations_list": [],
+    "precision": 1.0, "recall": 1.0, "f1": 1.0
+  }
+}

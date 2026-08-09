@@ -1,0 +1,30 @@
+{
+  "category": "correct_answer_correct_evidence",
+  "quality_rank": 1,
+  "description": "Every gold-relevant transaction (the full fraud chain: initial transfers, layering, exit) is cited, every claim is grounded, nothing fabricated.",
+  "report_text": "N100 sent funds to M201 (T1-001) and M202 (T1-002). Both forwarded to M301 (T1-003, T1-004), which sent funds offshore (T2-001).",
+  "claims": [
+    { "text": "N100 sent funds to both first-layer mules.", "cited_txn_ids": ["T1-001", "T1-002"], "judge_support": "supported" },
+    { "text": "Both first-layer mules forwarded funds to the aggregator.", "cited_txn_ids": ["T1-003", "T1-004"], "judge_support": "supported" },
+    { "text": "The aggregator sent funds offshore.", "cited_txn_ids": ["T2-001"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 5,
+    "missing_gold_citations_count": 0,
+    "unsupported_or_contradicted_claim_count": 0
+  },
+  "findings": [
+    { "account_id": "N100", "classification": "victim" },
+    { "account_id": "M201", "classification": "mule" },
+    { "account_id": "M202", "classification": "mule" },
+    { "account_id": "M301", "classification": "mule" },
+    { "account_id": "EXT401", "classification": "exit_point" },
+    { "account_id": "N150", "classification": "cleared" },
+    { "account_id": "N160", "classification": "cleared" },
+    { "account_id": "N170", "classification": "cleared" }
+  ],
+  "expected_discrete_findings": {
+    "false_positive_innocent_accounts": [],
+    "false_negative_suspicious_accounts": []
+  }
+}

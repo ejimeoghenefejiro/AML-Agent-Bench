@@ -1,0 +1,15 @@
+{
+  "category": "correct_conclusion_incomplete_evidence",
+  "quality_rank": 2,
+  "description": "Correctly identifies the first two hops of the fraud chain but stops before the exit leg -- misses 2 of the 5 gold-relevant transactions. Nothing it cites is wrong.",
+  "report_text": "N100 sent funds to M201 (T1-001) and M202 (T1-002), which forwarded to M301 (T1-003).",
+  "claims": [
+    { "text": "N100 sent funds to both first-layer mules.", "cited_txn_ids": ["T1-001", "T1-002"], "judge_support": "supported" },
+    { "text": "One mule forwarded funds to the aggregator.", "cited_txn_ids": ["T1-003"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 3,
+    "missing_gold_citations_count": 2,
+    "unsupported_or_contradicted_claim_count": 0
+  }
+}

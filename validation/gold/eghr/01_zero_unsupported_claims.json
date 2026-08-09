@@ -1,0 +1,17 @@
+{
+  "scenario": "zero_unsupported_claims",
+  "description": "Every claim cites real evidence and the judge marked every claim supported. Baseline: a fully-grounded report must score EGHR = 0.",
+  "valid_txn_ids": ["T1-001", "T1-002", "T1-003"],
+  "claims": [
+    { "claim_id": "C1", "text": "N100 sent 15000 GBP to M201.", "cited_txn_ids": ["T1-001"], "judge_support": "supported" },
+    { "claim_id": "C2", "text": "N100 sent 12000 GBP to M202.", "cited_txn_ids": ["T1-002"], "judge_support": "supported" },
+    { "claim_id": "C3", "text": "M201 forwarded 14800 GBP to M301.", "cited_txn_ids": ["T1-003"], "judge_support": "supported" }
+  ],
+  "expected": {
+    "total_claims": 3,
+    "supported_count": 3,
+    "unsupported_count": 0,
+    "contradicted_count": 0,
+    "eghr_rate": 0.0
+  }
+}

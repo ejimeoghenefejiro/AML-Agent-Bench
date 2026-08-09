@@ -1,0 +1,16 @@
+{
+  "scenario": "unsupported_relationship_claim",
+  "description": "A claim asserting a relationship between two entities that the relationship graph does not contain -- an invented connection rather than a wrong number, judged 'unsupported' since it is unverifiable (no record confirms or refutes it existing at all, it simply is not present).",
+  "valid_txn_ids": ["T1-001", "T1-002"],
+  "claims": [
+    { "claim_id": "C1", "text": "N100 sent 15000 GBP to M201.", "cited_txn_ids": ["T1-001"], "judge_support": "supported" },
+    { "claim_id": "C2", "text": "N150 and M301 are jointly controlled by the same beneficial owner.", "cited_txn_ids": [], "judge_support": "unsupported", "note": "No relationship record in data/relationships.json connects N150 and M301 at all -- this is an invented relationship claim, not a claim about a specific transaction." }
+  ],
+  "expected": {
+    "total_claims": 2,
+    "supported_count": 1,
+    "unsupported_count": 1,
+    "contradicted_count": 0,
+    "eghr_rate": 0.5
+  }
+}

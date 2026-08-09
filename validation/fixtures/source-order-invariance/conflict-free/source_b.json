@@ -1,0 +1,4 @@
+[
+  { "transaction_id": "TB-001", "source_account": "ACC3", "destination_account": "ACC4", "amount": "3000.00", "currency": "USD", "timestamp": "2026-01-01T11:00:00Z", "channel": "wire", "jurisdiction": "US", "sar_linked": "false" },
+  { "transaction_id": "TB-002", "source_account": "ACC4", "destination_account": "ACC5", "amount": "4000.00", "currency": "USD", "timestamp": "2026-01-01T12:00:00Z", "channel": "wire", "jurisdiction": "US", "sar_linked": "false" }
+]

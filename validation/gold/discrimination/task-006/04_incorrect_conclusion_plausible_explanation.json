@@ -1,0 +1,15 @@
+{
+  "category": "incorrect_conclusion_plausible_explanation",
+  "quality_rank": 4,
+  "description": "Cites exactly the same real, gold-relevant transactions as the perfect report (fixture 01) but draws an incorrect overall conclusion from them -- a plausible-sounding alternative explanation that the case data does not actually support.",
+  "report_text": "T2-003, T2-006, T2-008, T2-010, T2-012, T2-014, T2-016 and T3-001, T3-002, T3-003, T3-004, T3-005, T3-006 reflect a planned quarterly treasury restructuring, not anomalous activity -- large intermediary transfers followed by jurisdictional diversification are consistent with routine corporate cash management.",
+  "claims": [
+    { "text": "Week 2/3 transfers reflect planned treasury restructuring, not an anomaly.", "cited_txn_ids": ["T2-003", "T2-006", "T2-008", "T2-010", "T2-012", "T2-014", "T2-016", "T3-001", "T3-002", "T3-003", "T3-004", "T3-005", "T3-006"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 13,
+    "missing_gold_citations_count": 0,
+    "unsupported_or_contradicted_claim_count": 0
+  },
+  "flag": "MAJOR SCOPE FINDING: this report's citations are byte-for-byte the same coverage as the perfect report (fixture 01), and the judge_support label used here ('supported') is exactly what a citation-existence check can verify -- the citations ARE real and DO relate to the cited transactions. EGHR and evidence-traceability will therefore score this fixture IDENTICALLY to the perfect report on every metric, despite the conclusion being wrong. Neither EGHR nor evidence-traceability can distinguish 'correct conclusion, correct evidence' from 'incorrect conclusion, technically-real evidence' -- that requires the LLM-judge's qualitative rubric dimensions (task-006's anomaly_detection / fact_vs_assumption dimensions), which needs a live judge call and is not computed in this deterministic validation pass. This is the single clearest evidence that EGHR/evidence-traceability are necessary but not sufficient benchmark signals."
+}

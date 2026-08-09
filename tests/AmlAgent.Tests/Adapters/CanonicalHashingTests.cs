@@ -103,6 +103,20 @@ public class CanonicalHashingTests
     }
 
     [Fact]
+    public void ComputeNormalisationHash_SameAmountDifferentDecimalScale_ProducesSameHash()
+    {
+        // Regression for a real bug found via research-validation format-invariance
+        // testing: Parquet's fixed-column decimal scale can round-trip 50000.00m as
+        // 50000m (or vice versa) -- the same logical amount, different C# decimal
+        // scale. A bare decimal.ToString() is scale-preserving ("50000.00" vs
+        // "50000"), which used to make the hash differ for identical values purely
+        // because of which storage format produced them.
+        var scale2 = CanonicalAmlDataset.Empty() with { Transactions = new[] { Txn("T1", amount: 50000.00m) } };
+        var scale0 = CanonicalAmlDataset.Empty() with { Transactions = new[] { Txn("T1", amount: 50000m) } };
+        Assert.Equal(CanonicalHashing.ComputeNormalisationHash(scale2), CanonicalHashing.ComputeNormalisationHash(scale0));
+    }
+
+    [Fact]
     public void ComputeNormalisationHash_DifferentSchemaVersion_ProducesDifferentHash()
     {
         var v1 = CanonicalAmlDataset.Empty("aml-canonical-1.0");

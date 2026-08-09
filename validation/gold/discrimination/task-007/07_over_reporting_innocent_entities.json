@@ -1,0 +1,19 @@
+{
+  "category": "over_reporting_innocent_entities",
+  "quality_rank": 7,
+  "description": "This category is not a citation-grounding failure -- it is an entity-classification failure, measured against mule_network_findings.csv's account_id/classification columns, not EGHR/traceability. The core network is correctly identified, but two known-innocent accounts (N150, N160) are also wrongly flagged as part of the network.",
+  "findings": [
+    { "account_id": "N100", "classification": "victim" },
+    { "account_id": "M201", "classification": "mule" },
+    { "account_id": "M202", "classification": "mule" },
+    { "account_id": "M301", "classification": "mule" },
+    { "account_id": "EXT401", "classification": "exit_point" },
+    { "account_id": "N150", "classification": "mule" },
+    { "account_id": "N160", "classification": "watchlist_match" },
+    { "account_id": "N170", "classification": "cleared" }
+  ],
+  "expected_discrete": {
+    "false_positive_innocent_accounts": ["N150", "N160"],
+    "false_negative_suspicious_accounts": []
+  }
+}

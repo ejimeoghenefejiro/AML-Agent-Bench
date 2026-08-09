@@ -1,0 +1,14 @@
+{
+  "scenario": "perfect_precision_and_recall",
+  "description": "Report cites exactly the gold set, nothing more, nothing less.",
+  "report_text": "N100 sent funds to M201 (T1-001) and M202 (T1-002).",
+  "valid_txn_ids": ["T1-001", "T1-002", "T1-003"],
+  "gold_txn_ids": ["T1-001", "T1-002"],
+  "expected": {
+    "cited_total": 2, "cited_distinct": 2,
+    "fabricated_citations": [],
+    "grounded_distinct": 2,
+    "gold_total": 2, "matched_gold_citations": 2, "missing_gold_citations_list": [],
+    "precision": 1.0, "recall": 1.0, "f1": 1.0
+  }
+}

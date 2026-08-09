@@ -1,0 +1,15 @@
+{
+  "category": "correct_conclusion_incomplete_evidence",
+  "quality_rank": 2,
+  "description": "Reaches the right overall conclusion and every citation it does make is real and relevant, but only cites 6 of the 13 gold-relevant transactions -- thinner grounding than the ideal report, not wrong.",
+  "report_text": "Week 2 shows a spike through new intermediaries, evidenced by T2-003, T2-006, T2-008. Week 3 shows exit to high-risk jurisdictions via T3-001, T3-002, T3-003.",
+  "claims": [
+    { "text": "New intermediary accounts receive layered funds in week 2.", "cited_txn_ids": ["T2-003", "T2-006", "T2-008"], "judge_support": "supported" },
+    { "text": "Funds exit to high-risk jurisdictions in week 3.", "cited_txn_ids": ["T3-001", "T3-002", "T3-003"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 6,
+    "missing_gold_citations_count": 7,
+    "unsupported_or_contradicted_claim_count": 0
+  }
+}

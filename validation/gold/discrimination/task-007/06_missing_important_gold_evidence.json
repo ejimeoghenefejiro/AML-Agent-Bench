@@ -1,0 +1,14 @@
+{
+  "category": "missing_important_gold_evidence",
+  "quality_rank": 6,
+  "description": "Cites only the very first hop of the fraud chain, missing the layering and exit legs entirely -- severely thin grounding. Nothing cited is wrong, there just isn't enough of it.",
+  "report_text": "N100 sent funds to M201 (T1-001).",
+  "claims": [
+    { "text": "N100 sent funds to a mule account.", "cited_txn_ids": ["T1-001"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 1,
+    "missing_gold_citations_count": 4,
+    "unsupported_or_contradicted_claim_count": 0
+  }
+}

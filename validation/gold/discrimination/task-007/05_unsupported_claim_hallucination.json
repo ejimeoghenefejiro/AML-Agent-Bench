@@ -1,0 +1,17 @@
+{
+  "category": "unsupported_claim_hallucination",
+  "quality_rank": 5,
+  "description": "Cites 3 of the 5 gold-relevant transactions accurately, but also makes two invented claims with no citation at all.",
+  "report_text": "N100 sent funds to M201 (T1-001) and M202 (T1-002), which forwarded to M301 (T1-003).",
+  "claims": [
+    { "text": "N100 sent funds to both first-layer mules.", "cited_txn_ids": ["T1-001", "T1-002"], "judge_support": "supported" },
+    { "text": "One mule forwarded funds to the aggregator.", "cited_txn_ids": ["T1-003"], "judge_support": "supported" },
+    { "text": "The victim has been targeted by this same crime ring twice before.", "cited_txn_ids": [], "judge_support": "unsupported" },
+    { "text": "M301 is known to launder for multiple unrelated criminal groups.", "cited_txn_ids": [], "judge_support": "unsupported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 3,
+    "missing_gold_citations_count": 2,
+    "unsupported_or_contradicted_claim_count": 2
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "_comment": "SYNTHETIC TEST FIXTURE ONLY -- not real human annotation data. Used solely to exercise HumanAnnotationReader and JudgeVsHumanComparison in tests/AmlAgent.ResearchValidation/HumanAnnotationTests.cs. See README.md in this directory.",
+  "case_id": "task-007-case-001",
+  "output_id": "agent-output-003",
+  "annotators": [
+    {
+      "annotator_id": "H01",
+      "claims": [
+        { "claim_id": "C1", "classification": "supported", "evidence_ids": ["T1-001", "T1-002"] },
+        { "claim_id": "C2", "classification": "unsupported", "evidence_ids": [] },
+        { "claim_id": "C3", "classification": "contradicted", "evidence_ids": ["T1-003"] }
+      ],
+      "rubric_scores": { "network_identification": 4, "evidence_grounding": 5, "avoids_false_implication": 3 }
+    },
+    {
+      "annotator_id": "H02",
+      "claims": [
+        { "claim_id": "C1", "classification": "supported", "evidence_ids": ["T1-001"] },
+        { "claim_id": "C2", "classification": "supported", "evidence_ids": ["T1-002"] },
+        { "claim_id": "C3", "classification": "contradicted", "evidence_ids": ["T1-003"] }
+      ],
+      "rubric_scores": { "network_identification": 3, "evidence_grounding": 4, "avoids_false_implication": 3 }
+    }
+  ]
+}

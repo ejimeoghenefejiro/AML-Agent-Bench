@@ -1,0 +1,14 @@
+{
+  "category": "missing_important_gold_evidence",
+  "quality_rank": 6,
+  "description": "Cites only 2 of the 13 gold-relevant transactions -- severely thin grounding, worse than fixture 02's incomplete-but-reasonable coverage. What little is cited is accurate; nothing is fabricated or hallucinated.",
+  "report_text": "Some funds exited to a high-risk jurisdiction, evidenced by T3-001, T3-002.",
+  "claims": [
+    { "text": "Funds exited to a high-risk jurisdiction.", "cited_txn_ids": ["T3-001", "T3-002"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 2,
+    "missing_gold_citations_count": 11,
+    "unsupported_or_contradicted_claim_count": 0
+  }
+}
