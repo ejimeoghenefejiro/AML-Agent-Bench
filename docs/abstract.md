@@ -1,4 +1,4 @@
-# Anti-Money Laundering Agent Benchmark: Evaluating Hallucination, Evidence Traceability, Bias, Explainability and Regulatory Trust in Autonomous AI Agents for Financial Crime Detection
+# AML-Agent-Bench: A Benchmark for Evidence Traceability in Autonomous AI Agents for Anti-Money Laundering Investigations
 
 > **Thesis abstract.** Canonical, citable form, aligned to the PhD Research
 > Proposal (`Proposal/Oghenefejiro Ejime - PhD Research Proposal.pdf`). The
@@ -7,45 +7,43 @@
 
 ---
 
+## One-sentence definition
+
+This PhD develops and validates a benchmark for measuring whether the investigative conclusions produced by autonomous AML agents can be reliably traced to the transaction-level and case-level evidence that supports them.
+
 ## Abstract
 
-Financial institutions are rapidly adopting artificial intelligence to support anti-money laundering (AML) and broader financial crime detection. The most recent shift is from static machine-learning classifiers towards autonomous AI agents built on large language models (LLMs) that can reason over multiple steps, call external tools, retrieve evidence, synthesise narratives and draft compliance outputs. These capabilities make agents attractive for suspicious-activity triage, customer risk assessment, typology recognition and case summarisation; the same capabilities also introduce new and poorly understood failure modes — an agent may assert facts the underlying transaction record does not support (hallucination), fail to link its conclusions to traceable evidence, behave inconsistently across customer or jurisdictional groups (bias), produce explanations that do not reflect its actual reasoning, or leave an audit trail inadequate for regulatory review.
+Artificial intelligence is increasingly being explored for Anti-Money Laundering (AML) investigation, while emerging autonomous AI agents extend conventional machine-learning systems by retrieving records, invoking analytical tools, reasoning across multiple steps, and generating investigative conclusions. Existing AML evaluation has largely focused on predictive performance, while general-purpose agent benchmarks predominantly assess task completion and tool use. These measures do not establish whether the evidentiary basis of an agent's investigative conclusions can be independently reconstructed and verified.
 
-General-purpose agent benchmarks such as AgentBench, τ-bench and GAIA evaluate broad capability and tool use, but none addresses the evidentiary, fairness and regulatory demands that govern financial crime detection. This research designs, implements and validates **AML-Agent-Bench**, a domain-specific benchmark for evaluating autonomous AI agents in AML workflows. The primary contribution is a rigorous, operationalised methodology for measuring **hallucination** and **evidence traceability** in agentic AML reasoning, supported by secondary evaluation dimensions covering bias, explainability, auditability and regulatory trust. The work follows a design-science methodology, uses synthetic and public financial-crime datasets (AMLSim, the IBM/NeurIPS synthetic AML transaction data and the Elliptic Bitcoin dataset) to avoid personal data, and grounds its trust criteria in recognised frameworks including the FATF technology guidance, the EU AI Act and supervisory model-risk guidance (SR 11-7). The expected outcome is a reusable open-source benchmark, empirical evidence on where current agents fail in AML contexts, and practical guidance for the responsible evaluation of agentic AI before deployment in regulated environments.
+This research addresses this problem through the design, implementation, and validation of **AML-Agent-Bench**, a domain-specific benchmark for measuring evidence traceability in autonomous AI agents performing AML investigations. Evidence traceability is defined as the degree to which material investigative claims can be linked to identifiable, valid, relevant, and sufficient evidence within the underlying case record. The research operationalises this construct through claim–evidence mappings and measures covering evidence-reference validity, precision, recall, claim-support coverage, and evidentiary sufficiency.
 
-## Six evaluation dimensions
+A design-science methodology is combined with controlled experimental evaluation. AML investigation scenarios will be constructed from synthetic and appropriate public financial-crime datasets and annotated with validated reference evidence sets. Annotation procedures will be assessed through independent human review and inter-rater agreement where feasible. Autonomous agents employing different underlying language models and evidence-oriented architectures will then be evaluated under comparable investigative conditions. Experiments will examine the effects of model choice, task complexity, and traceability-oriented interventions on evidentiary performance, while also examining the relationship between conventional task success and evidence traceability.
 
-The benchmark evaluates an AML agent along six layered dimensions. The first two are the primary doctoral contribution; the remainder are secondary dimensions assessed through the same harness and reported as a comprehensive risk profile rather than as separate deep studies.
+The research contributes a formal framework for evidence traceability in agentic AML investigation, a validated measurement methodology, empirical evidence concerning the evidentiary performance of contemporary AI agents, and an open-source benchmark implementation. AML-Agent-Bench is not intended to determine whether AI agents should autonomously make financial-crime decisions; it is intended to provide reproducible evidence concerning whether their investigative outputs can be independently traced and reviewed before supporting human decision-making.
 
-| Dimension | Priority | What it measures | Primary metric |
-|---|---|---|---|
-| Task performance | Baseline | Correctness of suspicious-activity identification, typology recognition and risk classification | F1 / balanced accuracy |
-| Hallucination | **Primary** | Rate of claims unsupported or contradicted by case evidence (intrinsic vs extrinsic) | Evidence-Grounded Hallucination Rate (EGHR) |
-| Evidence traceability | **Primary** | Whether each conclusion is correctly linked to the supporting transactions/records | Citation precision / recall |
-| Bias and fairness | Secondary | Disparity in flags / risk scores across matched counterfactual customer and jurisdiction profiles | Demographic-parity & equal-opportunity gaps |
-| Explainability | Secondary | Quality and faithfulness of generated explanations to the actual decision path | Rubric score + faithfulness check |
-| Auditability & trust | Secondary | Completeness of audit logs, alignment to regulatory expectations, uncertainty calibration, run-to-run consistency | Audit-completeness %, ECE, consistency |
+## What evidence traceability means
+
+Evidence traceability is the degree to which material claims produced by an autonomous AML agent can be systematically linked to identifiable, valid, relevant, and sufficient evidence within the underlying investigation record, such that the evidentiary basis of the conclusion can be independently reconstructed and reviewed. See [docs/evidence-traceability-framework.md](evidence-traceability-framework.md) for the full formal definition, the claim–evidence model, and the traceability failure taxonomy.
 
 ## Research questions
 
-**Primary (RQ1).** How can hallucination and evidence traceability in autonomous AML agents be defined, measured reproducibly, and reduced, such that agent conclusions are reliably grounded in the underlying case evidence?
+**RQ1 — Conceptualisation.** How should evidence traceability in autonomous AML-agent investigations be conceptualised and operationalised at claim and evidence level?
 
-**Supporting:**
+**RQ2 — Measurement and validation.** To what extent can evidence traceability be measured reliably using claim-level evidence validity, precision, recall, coverage, and sufficiency measures against validated reference evidence?
 
-- **RQ2** — What forms of bias and explainability failure arise when AI agents are applied to AML tasks, and how can they be measured through counterfactual and faithfulness testing?
-- **RQ3** — Which evaluation metrics most validly capture the reliability, auditability and regulatory suitability of AML agents, and how reliable is LLM-as-judge scoring in this domain?
-- **RQ4** — How do different agent architectures (single-agent tool use, retrieval-augmented, multi-agent) and underlying models compare across AML task types and risk dimensions?
-- **RQ5** — What audit and governance mechanisms, mapped to FATF, EU AI Act and model-risk expectations, are needed to make AML agents acceptable in regulated environments?
+**RQ3 — Empirical variation.** How does evidence-traceability performance vary across underlying language models, agent architectures, AML task types, and task-complexity levels?
+
+**RQ4 — Improvement interventions.** Which agent-design interventions improve evidence traceability without materially degrading AML task performance?
 
 ## Current prototype
 
-The open-source codebase in this repository is the working foundation the proposal is built on and de-risked by, not yet the finished instrument the proposal describes. It currently implements a C#/.NET 8 agent core on Microsoft Semantic Kernel, a polyglot Docker benchmark harness, two AML tasks (static graph-clustering/risk-scoring and temporal anomaly detection), deterministic xUnit scoring, and an LLM-as-judge that grades a compliance-style report against a six-criterion rubric (evidence citation, temporal reasoning, anomaly detection, fact-vs-assumption separation, compliance tone, absence of unsupported claims).
+The open-source codebase in this repository is the working foundation the research is built on and de-risked by, not yet the finished measurement instrument the proposal describes. It currently implements a C#/.NET 8 agent core on Microsoft Semantic Kernel, a polyglot Docker benchmark harness, a multi-format data-adapter layer (CSV/JSON/Parquet/SQL Server/PostgreSQL/Neo4j/GraphML/REST) feeding a canonical AML case model, several AML tasks spanning static graph-clustering, temporal anomaly detection, and multi-source mule-network investigation, deterministic xUnit scoring, and an LLM-as-judge that grades a compliance-style report against a task rubric.
 
-On top of that rubric, the judge now also computes the proposal's two **primary metrics directly**: an Evidence-Grounded Hallucination Rate (claim extraction with a deterministic citation-existence override, so the LLM cannot mark a fabricated transaction ID as supported) and evidence-traceability citation precision/recall against a curated gold-evidence set — both fully implemented for Task 006 (`src/AmlAgent.Evidence/EvidenceScoring.cs`). Bias/fairness, faithfulness-via-perturbation and audit-completeness/calibration are not yet built. See [docs/dimension-mapping.md](dimension-mapping.md) for the honest, criterion-by-criterion mapping between what is proposed and what is implemented today, and the [provisional timeline](../README.md#1-research-problem) for how the remaining gap closes.
+On top of that rubric, the judge also computes deterministic evidence-traceability measures directly: citation precision/recall against a curated gold-evidence set, and a claim-level unsupported/fabricated-citation check (the legacy "Evidence-Grounded Hallucination Rate", EGHR — see [docs/evidence-traceability-framework.md](evidence-traceability-framework.md#legacy-eghr-metric) for how it now maps onto the traceability failure taxonomy) — both implemented for the static and temporal-anomaly tasks (`src/AmlAgent.Evidence/EvidenceScoring.cs`). Claim-level sufficiency, claim-support coverage, and multi-annotator gold-evidence validation are not yet built. See [docs/research-scope-mapping.md](research-scope-mapping.md) for the honest, component-by-component mapping between what is proposed and what is implemented today.
 
 ---
 
-**Keywords:** agentic AI · large language models · anti-money laundering · benchmark · hallucination · evidence traceability · bias and fairness · explainability · auditability · regulatory trust · LLM-as-judge · Semantic Kernel · RegTech · FATF · EU AI Act
+**Keywords:** agentic AI · autonomous AI agents · anti-money laundering · evidence traceability · claim–evidence mapping · benchmark evaluation · auditability · reproducibility · RegTech · LLM-as-judge · Semantic Kernel · FATF · EU AI Act
 
 ## Citation
 
@@ -54,9 +52,8 @@ If you reference this work, please cite as:
 ```bibtex
 @misc{aml-agent-bench,
   author       = {Ejime, Oghenefejiro Macdonald},
-  title        = {{AML-Agent-Bench}: Evaluating Hallucination, Evidence Traceability,
-                   Bias, Explainability and Regulatory Trust in Autonomous AI Agents
-                   for Financial Crime Detection},
+  title        = {{AML-Agent-Bench}: A Benchmark for Evidence Traceability in
+                   Autonomous AI Agents for Anti-Money Laundering Investigations},
   year         = {2026},
   howpublished = {\url{https://github.com/ejimeoghenefejiro/AML-Agent-Bench}},
   note         = {PhD research codebase, University of Salford}
@@ -67,6 +64,10 @@ If you reference this work, please cite as:
 
 - [README](../README.md) — pull, build and run instructions
 - [docs/research-problem.md](research-problem.md) — extended motivation and research gap
-- [docs/dimension-mapping.md](dimension-mapping.md) — proposal dimensions vs. current implementation status
+- [docs/evidence-traceability-framework.md](evidence-traceability-framework.md) — formal claim–evidence model and failure taxonomy
+- [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md) — how reference evidence is annotated
+- [docs/validation-plan.md](validation-plan.md) — content/construct/convergent/discriminant validity and reliability plan
+- [docs/experimental-design.md](experimental-design.md) — the planned controlled experimental programme
+- [docs/research-scope-mapping.md](research-scope-mapping.md) — proposal components vs. current implementation status
 - `Proposal/Oghenefejiro Ejime - PhD Research Proposal.pdf` — full PhD research proposal
 - [tasks/](../tasks/) — current benchmark tasks

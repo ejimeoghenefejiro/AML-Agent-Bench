@@ -1,28 +1,30 @@
 # AML-Agent-Bench
 
-> Anti-Money Laundering Agent Benchmark: evaluating **hallucination**, **evidence traceability**, bias, explainability and regulatory trust in autonomous AI agents for financial crime detection.
+> A Benchmark for Evidence Traceability in Autonomous AI Agents for Anti-Money Laundering Investigations.
 
-**Status:** active PhD research codebase, and the working prototype the PhD proposal (`Proposal/Oghenefejiro Ejime - PhD Research Proposal.pdf`) is de-risked by. C# / .NET 8 end-to-end, Microsoft Semantic Kernel as the agent core, polyglot Docker harness so non-C# agents can also be benchmarked, dual deterministic + LLM-as-judge evaluation, first cross-model and cross-language preliminary results captured. See [docs/dimension-mapping.md](docs/dimension-mapping.md) for exactly what of the proposal's six evaluation dimensions is implemented today versus planned.
+**One-sentence definition:** this PhD develops and validates a benchmark for measuring whether the investigative conclusions produced by autonomous AML agents can be reliably traced to the transaction-level and case-level evidence that supports them.
+
+**Status:** active PhD research codebase, and the working prototype the PhD proposal (`Proposal/Oghenefejiro Ejime - PhD Research Proposal.pdf`) is de-risked by. C# / .NET 8 end-to-end, Microsoft Semantic Kernel as the agent core, a polyglot Docker harness so non-C# agents can also be benchmarked, a multi-format data-adapter layer feeding a canonical AML case model, dual deterministic + LLM-as-judge evaluation, first cross-model, cross-language, and repeated-run preliminary results captured. See [docs/research-scope-mapping.md](docs/research-scope-mapping.md) for exactly what of the research design is implemented today versus planned.
 
 ---
 
 ## Abstract
 
-> ### Anti-Money Laundering Agent Benchmark: Evaluating Hallucination, Evidence Traceability, Bias, Explainability and Regulatory Trust in Autonomous AI Agents for Financial Crime Detection
+> ### AML-Agent-Bench: A Benchmark for Evidence Traceability in Autonomous AI Agents for Anti-Money Laundering Investigations
 >
-> Financial institutions are rapidly adopting artificial intelligence to support anti-money laundering (AML) and broader financial crime detection. The most recent shift is from static machine-learning classifiers towards autonomous AI agents built on large language models (LLMs) that can reason over multiple steps, call external tools, retrieve evidence, synthesise narratives and draft compliance outputs. These capabilities also introduce new and poorly understood failure modes: an agent may assert facts the underlying transaction record does not support (hallucination), fail to link conclusions to traceable evidence, behave inconsistently across customer or jurisdictional groups (bias), produce explanations that do not reflect its actual reasoning, or leave an audit trail inadequate for regulatory review.
+> Artificial intelligence is increasingly being explored for Anti-Money Laundering (AML) investigation, while emerging autonomous AI agents extend conventional machine-learning systems by retrieving records, invoking analytical tools, reasoning across multiple steps, and generating investigative conclusions. Existing AML evaluation has largely focused on predictive performance, while general-purpose agent benchmarks such as AgentBench, τ-bench and GAIA predominantly assess task completion and tool use. These measures do not establish whether the evidentiary basis of an agent's investigative conclusions can be independently reconstructed and verified.
 >
-> General-purpose agent benchmarks such as AgentBench, τ-bench and GAIA evaluate broad capability and tool use, but none addresses the evidentiary, fairness and regulatory demands that govern financial crime detection. This research designs, implements and validates **AML-Agent-Bench**, a domain-specific benchmark for evaluating autonomous AI agents in AML workflows. The primary contribution is a rigorous, operationalised methodology for measuring **hallucination** and **evidence traceability** in agentic AML reasoning, supported by secondary evaluation dimensions covering bias, explainability, auditability and regulatory trust — grounded in FATF technology guidance, the EU AI Act and supervisory model-risk guidance (SR 11-7), and evaluated on synthetic/public financial-crime datasets (AMLSim, IBM/NeurIPS synthetic AML data, Elliptic Bitcoin).
+> This research addresses this problem through the design, implementation, and validation of **AML-Agent-Bench**, a domain-specific benchmark for measuring evidence traceability in autonomous AI agents performing AML investigations. Evidence traceability is defined as the degree to which material investigative claims can be linked to identifiable, valid, relevant, and sufficient evidence within the underlying case record. The research operationalises this construct through claim–evidence mappings and measures covering evidence-reference validity, precision, recall, claim-support coverage, and evidentiary sufficiency.
 >
 > Methodologically, the benchmark contributes a reusable evaluation architecture. A reference agent implemented in C# with Microsoft Semantic Kernel acts both as the primary subject of investigation and as the LLM-as-judge that scores other agents. A language-agnostic Docker harness enables any agent — packaged as a folder, a pre-built image, or a user submission — to be benchmarked against identical tasks, supporting cross-architecture and cross-language comparison.
 >
-> The work is organised around one primary and four supporting research questions (see [docs/abstract.md](docs/abstract.md) for the full list). Beyond the benchmark itself, contributions include operational metrics for evidence-grounded hallucination and evidence traceability, the reproducible task design, the dual-evaluator methodology, and a mapping from benchmark evidence to regulatory expectations. By focusing evaluation on the specific reasoning a financial-crime analyst would need to defend in front of a regulator, AML-Agent-Bench establishes a foundation for measuring — and ultimately improving — agentic AI in high-stakes RegTech settings.
+> The research contributes a formal framework for evidence traceability in agentic AML investigation, a validated measurement methodology, empirical evidence concerning the evidentiary performance of contemporary AI agents, and an open-source benchmark implementation. AML-Agent-Bench is not intended to determine whether AI agents should autonomously make financial-crime decisions; it is intended to provide reproducible evidence concerning whether their investigative outputs can be independently traced and reviewed before supporting human decision-making.
 
-**Keywords:** agentic AI · large language models · anti-money laundering · benchmark · hallucination · evidence traceability · bias and fairness · explainability · auditability · regulatory trust · LLM-as-judge · Semantic Kernel · RegTech · FATF · EU AI Act
+**Keywords:** agentic AI · autonomous AI agents · anti-money laundering · evidence traceability · claim–evidence mapping · benchmark evaluation · auditability · reproducibility · RegTech · LLM-as-judge · Semantic Kernel · FATF · EU AI Act
 
-> Canonical standalone copy of the abstract (with full RQ list, six-dimension table and BibTeX): [docs/abstract.md](docs/abstract.md). Proposal-vs-implementation gap analysis: [docs/dimension-mapping.md](docs/dimension-mapping.md).
+> Canonical standalone copy of the abstract (with full RQ list and BibTeX): [docs/abstract.md](docs/abstract.md). Formal claim–evidence model and failure taxonomy: [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md). Proposal-vs-implementation gap analysis: [docs/research-scope-mapping.md](docs/research-scope-mapping.md).
 >
-> First cross-model and cross-language results: [docs/preliminary-results.md](docs/preliminary-results.md). Demo script for supervisor meetings: [docs/demo-script.md](docs/demo-script.md). One-button reproducer for both with-Docker and without-Docker runs: [docs/reproduce.md](docs/reproduce.md).
+> First cross-model, cross-language, and repeated-run results: [docs/preliminary-results.md](docs/preliminary-results.md). Demo script for supervisor meetings: [docs/demo-script.md](docs/demo-script.md). One-button reproducer for both with-Docker and without-Docker runs: [docs/reproduce.md](docs/reproduce.md).
 
 ---
 
@@ -51,20 +53,11 @@
 
 ## 1. Research problem
 
-> We currently lack a rigorous, domain-appropriate way to determine whether an autonomous AI agent is trustworthy enough to support AML decision-making. General-purpose agent benchmarks (AgentBench, τ-bench, GAIA) evaluate broad capability and tool use, but none addresses the evidentiary, fairness and regulatory demands that govern financial crime detection.
+> How can evidence traceability in autonomous AML-agent investigations be rigorously defined, operationalised, measured, and validated?
 
-The benchmark evaluates an agent along **six dimensions** — task performance (baseline), hallucination and evidence traceability (**primary**), and bias/fairness, explainability, auditability & trust (secondary):
+**Evidence traceability is the sole primary doctoral construct.** Task performance is measured as a baseline, and reproducibility, auditability, human review, and governance are supporting properties assessed through the same harness — not separate deep studies competing for primacy. See [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md) for the formal definition and [docs/research-problem.md](docs/research-problem.md) for the full motivation and research gap.
 
-| Dimension | Priority | What it measures |
-|---|---|---|
-| Task performance | Baseline | Correctness of suspicious-activity identification, typology recognition and risk classification |
-| Hallucination | **Primary** | Rate of claims unsupported or contradicted by case evidence (Evidence-Grounded Hallucination Rate) |
-| Evidence traceability | **Primary** | Whether each conclusion is correctly linked to supporting transactions/records (citation precision/recall) |
-| Bias and fairness | Secondary | Disparity in flags/risk scores across matched counterfactual customer/jurisdiction profiles |
-| Explainability | Secondary | Quality and faithfulness of generated explanations to the actual decision path |
-| Auditability & trust | Secondary | Completeness of audit logs, regulatory alignment, uncertainty calibration, run-to-run consistency |
-
-Concretely, today's two tasks test whether an agent can:
+Concretely, today's three tasks test whether an agent can:
 
 - read structured transaction data and build a **directed weighted transaction graph**
 - identify connected account clusters and circular flows
@@ -78,7 +71,7 @@ Concretely, today's two tasks test whether an agent can:
 
 A second goal is methodological: **make this evaluation reproducible and language-agnostic** so different agent implementations and architectures (C# / Python / TypeScript / Go; single-agent, retrieval-augmented, multi-agent) can be compared on identical tasks.
 
-See [docs/research-problem.md](docs/research-problem.md) for the longer write-up (research gap, 5 RQs, candidate task families, dataset roadmap) and [docs/dimension-mapping.md](docs/dimension-mapping.md) for what's implemented today vs. planned.
+See [docs/research-problem.md](docs/research-problem.md) for the longer write-up (research gap, 4 RQs, task complexity taxonomy, dataset roadmap) and [docs/research-scope-mapping.md](docs/research-scope-mapping.md) for what's implemented today vs. planned.
 
 ---
 
@@ -92,7 +85,7 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 | **AmlAgent.Harness** | The runner: builds everything, runs the agent, scores it, writes results. | The **invigilator** — runs the exam and marks the candidate. |
 | **AmlAgent.Oracle** | A hand-written correct answer used to sanity-check the bench. | The **marking scheme** — the known-correct answers, used to prove the bench itself works. |
 | **AmlAgent.Tests** | Rule-based tests (xUnit) that check the agent's output is correct. | The **rubric** — the deterministic rules every answer must satisfy. |
-| **AmlAgent.Evidence** | Pure, dependency-free scoring logic for the two primary proposal metrics (EGHR, citation precision/recall). No LLM, network or file I/O. | The **statistician** — turns raw claims and citations into the actual hallucination and traceability numbers, with no opinion of its own. |
+| **AmlAgent.Evidence** | Pure, dependency-free scoring logic for the benchmark's evidence-traceability metrics (citation precision/recall) plus the legacy EGHR claim-support check. No LLM, network or file I/O. | The **statistician** — turns raw claims and citations into the actual traceability and legacy-hallucination numbers, with no opinion of its own. |
 
 **Put together:** the **Harness** (invigilator) gives the **Agent** (candidate) the AML task, then marks its output using the **Tests** (rubric) and the **Agent-as-judge** (reviewer). The **Oracle** (marking scheme) is the gold-standard answer used to prove the marking process itself is sound.
 
@@ -104,7 +97,7 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 | **Reference oracle** | `src/AmlAgent.Oracle/` | Pure-C# canonical solution for Task 001; produces ground-truth output without spending LLM tokens |
 | **Harness** | `src/AmlAgent.Harness/` | Benchmark runner; supports `--local` (no Docker) and Docker modes; writes consolidated `bench_result.json` per run |
 | **LLM-as-judge** | `agents/csharp-sk/Agent/JudgeAgent.cs` | The same SK core grades qualitative regulatory properties against a `rubric.json`, and computes EGHR + evidence traceability |
-| **Evidence scoring** | `src/AmlAgent.Evidence/` | Pure, unit-tested logic for EGHR and citation precision/recall — the proposal's two primary metrics |
+| **Evidence scoring** | `src/AmlAgent.Evidence/` | Pure, unit-tested logic for evidence-traceability citation precision/recall (primary) and the legacy EGHR claim-support check (secondary) |
 | **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort / citation assertions across two tasks and the judge report |
 | **Tasks** | `tasks/<task-id>/` | Self-contained task definitions: brief + data + expected behaviour + tests + rubric |
 | **Submissions** | `submissions/` (mostly gitignored) | Drop point for external agents; ships with one reference Python baseline |
@@ -374,6 +367,7 @@ See [submissions/README.md](submissions/README.md) for the full submission contr
 |---|---|---|---|---|
 | `aml-transaction-network` | Static AML graph analysis and suspicious-cluster risk scoring | Hard | `aml_clusters.csv` | xUnit |
 | `task-006-temporal-network-anomaly-detection` | Week-over-week anomaly detection with compliance-style reporting | Hard | `temporal_anomaly_summary.csv` + `temporal_anomaly_report.md` | xUnit + SK-as-judge |
+| `task-007-multi-source-mule-network` | Multi-source mule-network investigation (transactions + KYC + relationships + watchlist) | Hard | `mule_network_findings.csv` + investigative report | xUnit + SK-as-judge |
 
 ### Task 001 — `aml-transaction-network`
 
@@ -393,9 +387,15 @@ See [submissions/README.md](submissions/README.md) for the full submission contr
   [tests.md](tasks/task-006-temporal-network-anomaly-detection/tests.md),
   [rubric.json](tasks/task-006-temporal-network-anomaly-detection/rubric.json).
 
-More tasks can be added by creating a new `tasks/<id>/` folder with the same files. These two tasks cover the first two of the proposal's six candidate task families (suspicious-transaction/red-flag identification, and transaction-network/typology analysis); customer risk-profile/counterfactual-fairness, case-summarisation, regulatory-explanation and adversarial/robustness families are planned (see [docs/research-problem.md](docs/research-problem.md#candidate-task-families)).
+### Task 007 — `task-007-multi-source-mule-network`
 
-**See [docs/preliminary-results.md](docs/preliminary-results.md) for first real cross-model and cross-language results across both tasks.**
+- A canonical AML case merged from four heterogeneous sources (transactions, KYC/customer data, relationship graph, watchlist) via the multi-format data-adapter layer (`AmlAgent.Adapters`) — see `case-definition.json` and `case_manifest.json` for the merge/evidence-integrity provenance.
+- Level-3 task in the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy): the agent must establish a relational fraud pattern (mule network) spanning multiple sources, not just cite individual transactions.
+- See `tasks/task-007-multi-source-mule-network/`: [prompt.md](tasks/task-007-multi-source-mule-network/prompt.md), [expected-behaviour.md](tasks/task-007-multi-source-mule-network/expected-behaviour.md), [rubric.json](tasks/task-007-multi-source-mule-network/rubric.json).
+
+More tasks can be added by creating a new `tasks/<id>/` folder with the same files. These three tasks cover the first three levels of the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy) (direct evidence retrieval, multi-record/temporal aggregation, network reasoning); case synthesis and ambiguous/adversarial-evidence levels are planned.
+
+**See [docs/preliminary-results.md](docs/preliminary-results.md) for first real cross-model, cross-language, and repeated-run results.**
 
 ---
 
@@ -420,7 +420,7 @@ Tests are gated on workspace shape: e.g. Task 001 tests skip if `data/transfers.
 
 `aml-agent judge` loads a task's `rubric.json`, the agent's output file(s), and the underlying ground-truth data (so the judge can verify citations). It sends them to gpt-4o-mini through Semantic Kernel with `FunctionChoiceBehavior.None` and `ResponseFormat=json_object`, asking for structured scoring per dimension.
 
-On top of the six-dimension rubric score, the judge also computes the PhD proposal's two **primary metrics directly**: Evidence-Grounded Hallucination Rate (EGHR) and evidence-traceability citation precision/recall — see §8.3 below. See [docs/dimension-mapping.md](docs/dimension-mapping.md) for exactly what's implemented vs. still planned across all six dimensions.
+On top of the task's own 6-criterion rubric score, the judge also computes the benchmark's evidence-traceability measures **directly and deterministically**: citation precision/recall (primary) and the legacy EGHR claim-support check (secondary) — see §8.3 below. See [docs/research-scope-mapping.md](docs/research-scope-mapping.md) for exactly what's implemented vs. still planned.
 
 Example `judge_report.json` (real run, Task 006):
 
@@ -443,16 +443,16 @@ Example `judge_report.json` (real run, Task 006):
 
 The overall percentage and verdict are **recomputed defensively in C#** from the per-dimension scores — the LLM cannot game the arithmetic.
 
-### 8.3 The two primary proposal metrics: EGHR and evidence traceability
+### 8.3 Evidence traceability: the benchmark's primary metric (plus the legacy EGHR check)
 
-Alongside the six rubric dimensions, `judge_report.json` now also carries the proposal's headline primary metrics, computed by `src/AmlAgent.Evidence/EvidenceScoring.cs`:
+Alongside the task's own rubric dimensions, `judge_report.json` also carries the benchmark's evidence-traceability measures, computed by `src/AmlAgent.Evidence/EvidenceScoring.cs`. See [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md) for the formal model these implement.
 
-- **`eghr`** — Evidence-Grounded Hallucination Rate. The judge extracts atomic claims from the candidate's report and labels each `supported` / `unsupported` / `contradicted`. Any claim citing a transaction ID that doesn't exist in the source data is **deterministically forced to `unsupported`**, regardless of what the LLM said — the judge cannot inflate its own grounding. `rate = (unsupported + contradicted) / total_claims`.
-- **`evidence_traceability`** — citation precision/recall/F1. Computed **entirely deterministically** (regex citation extraction + set arithmetic, no LLM call), against a curated gold-evidence set per task (`tasks/<id>/evidence-annotations.json`).
+- **`evidence_traceability`** — citation precision/recall/F1, the PhD's primary metric. Computed **entirely deterministically** (regex citation extraction + set arithmetic, no LLM call), against a curated gold-evidence set per task (`tasks/<id>/evidence-annotations.json`).
+- **`eghr`** — Evidence-Grounded Hallucination Rate, retained as a **legacy/secondary** metric (see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md#legacy-eghr-metric) for why it's kept rather than removed). The judge extracts atomic claims from the candidate's report and labels each `supported` / `unsupported` / `contradicted`. Any claim citing a transaction ID that doesn't exist in the source data is **deterministically forced to `unsupported`**, regardless of what the LLM said — the judge cannot inflate its own grounding. `rate = (unsupported + contradicted) / total_claims`.
 
 **Grounding data format:** `EvidenceScoring.ParseTxnIdsFromFile` dispatches by file extension, so a task's `grounding_inputs` (in `rubric.json`) can be **CSV or JSON** — `ParseTxnIdsFromJson` accepts a top-level array of objects, or an object wrapping that array under `transactions`/`rows`/`data`/`transfers`/`records`. Task 006 actually lists both `weekly_transfers.csv` and `weekly_transfers.json` (identical data, two representations) to prove the two formats produce identical valid-ID sets in a live run, not just in unit tests. An unrecognised extension (e.g. `.xlsx`) contributes no IDs rather than throwing — genuine spreadsheet support would need a parser dependency and isn't implemented.
 
-Example from a real `gpt-4o-mini` run on Task 006 (2026-08-07) — note this run's six-dimension rubric scored `evidence_citation: 3/5` and passed overall at 80%, while the deterministic traceability metric shows the report actually cited only 1 of the 13 gold-evidence transactions:
+Example from a real `gpt-4o-mini` run on Task 006 (2026-08-07) — note this run's task rubric scored `evidence_citation: 3/5` and passed overall at 80%, while the deterministic traceability metric shows the report actually cited only 1 of the 13 gold-evidence transactions:
 
 ```json
 "eghr": {
@@ -466,14 +466,14 @@ Example from a real `gpt-4o-mini` run on Task 006 (2026-08-07) — note this run
 }
 ```
 
-This is the kind of gap the rubric score alone hides: a report can look compliant (cautious tone, some real citations, no accusations) while still being weakly grounded against the specific evidence that matters. See [docs/dimension-mapping.md](docs/dimension-mapping.md) for scope and limitations (currently task-006 only; gold set is hand-curated, not yet multi-annotator).
+This is the kind of gap the rubric score alone hides: a report can look compliant (cautious tone, some real citations, no accusations) while still being weakly grounded against the specific evidence that matters. See [docs/research-scope-mapping.md](docs/research-scope-mapping.md) for scope and limitations (currently task-006/task-007 only; gold set is hand-curated, not yet multi-annotator).
 
-### 8.4 The assurance profile: policy-based deployment decisions
+### 8.4 The assurance profile — a downstream application, not the doctoral core
 
-Every run against a judged task also produces `assurance_profile.json` (workspace copy + archival copy in `assurance-profiles/`, mirroring `results/`) — a machine-readable, schema-validated answer to *"is this agent suitable for operational deployment, and under what conditions?"*, per the "AML Agent Bench Real World Assurance Profile" vision document and its CLI-Only Assurance Roadmap follow-up (planning notes kept outside this repo; see [assurance/README.md](assurance/README.md) for the in-repo summary).
+Every run against a judged task also produces `assurance_profile.json` (workspace copy + archival copy in `assurance-profiles/`, mirroring `results/`) — a machine-readable, schema-validated answer to *"is this agent suitable for operational deployment, and under what conditions?"*. **This is a downstream application of evidence-traceability measurement, not the PhD's doctoral core** (see [assurance/README.md](assurance/README.md#positioning-relative-to-the-phd)) — it demonstrates how traceability evidence might feed a model-governance or human-review process; it is not a certification, regulatory approval, or a claim that a score alone determines safe deployment.
 
 - **`--policy <path>`** selects which policy to evaluate against (default `assurance/policy.default.json`; a stricter example ships at `assurance/policies/bank-strict.json`). Each threshold is `required` (a critical gate — failing it blocks deployment) or optional (a warning — failing it only downgrades the decision). A malformed or impossible policy is rejected at load time with a clear error, without crashing the rest of the run.
-- The decision is always one of `PASS`, `PASS_WITH_CONDITIONS`, or `NOT_READY_FOR_DEPLOYMENT` — separated from `execution_status` (did the agent process complete) and `benchmark_verdict` (did xUnit + judge pass). **A benchmark PASS is never the same thing as a deployment PASS** — they're printed side by side precisely because they disagree in practice (a report can score 76.7% on the six-dimension rubric while its EGHR/traceability numbers fail the policy outright).
+- The decision is always one of `PASS`, `PASS_WITH_CONDITIONS`, or `NOT_READY_FOR_DEPLOYMENT` — separated from `execution_status` (did the agent process complete) and `benchmark_verdict` (did xUnit + judge pass). **A benchmark PASS is never the same thing as a deployment PASS** — they're printed side by side precisely because they disagree in practice (a report can score 76.7% on its task rubric while its traceability/EGHR numbers fail the policy outright).
 - `aml-harness compare <profile.json> <profile.json> ...` prints a side-by-side table of two or more runs (agent, model, task, policy, task performance, EGHR, precision, recall, F1, fabricated citations, decision) and writes `comparison_result.json` for automation. Warns when the compared runs aren't actually equivalent (different task, policy, benchmark version, or dataset).
 - `aml-harness regress --baseline <profile.json> --candidate <profile.json>` diffs two runs metric-by-metric, reports newly-failed/newly-passed thresholds, flags `ASSURANCE REGRESSION DETECTED` when the decision strictly worsens, and writes `regression_result.json`. Exit code 1 on a detected regression, so it's usable as a CI-style gate.
 - Every profile is validated against a formal schema (`AmlAgent.Evidence.AssuranceProfileSchema`) before being written — a profile that doesn't match the schema fails generation explicitly rather than being silently written malformed.
@@ -792,11 +792,25 @@ The datasets in `tasks/*/environment/data/` are **synthetic** and intended only 
 
 This repository is the working prototype cited in §13 ("Resources and
 Feasibility") of `Proposal/Oghenefejiro Ejime - PhD Research Proposal.pdf`
-as evidence of feasibility, not the finished six-dimension benchmark the
-proposal specifies as the three-year deliverable. For a precise,
-criterion-by-criterion account of what's implemented, what's a partial
-proxy, and what's not started yet, see
-[docs/dimension-mapping.md](docs/dimension-mapping.md).
+as evidence of feasibility, not the finished evidence-traceability
+measurement instrument the proposal specifies as the deliverable. For a
+precise, component-by-component account of what's implemented, what's a
+partial proxy, and what's not started yet, see
+[docs/research-scope-mapping.md](docs/research-scope-mapping.md).
+
+---
+
+## Limitations
+
+Stated plainly, not to be discovered by reading the code:
+
+- The current gold evidence set is small and single-author (no independent or multi-annotator validation yet — see [docs/evidence-annotation-protocol.md](docs/evidence-annotation-protocol.md)).
+- Claim-level evidence sufficiency and claim-support coverage are not yet implemented (see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md)).
+- The task set is small (three tasks across three complexity levels; see [docs/research-problem.md](docs/research-problem.md#task-complexity-taxonomy)).
+- Current preliminary results (`docs/preliminary-results.md`) are single-run, single-model/task data points, not a controlled study.
+- LLM-based semantic judgement (the judge's claim-support labels) is not yet validated against human raters.
+- Reproducibility of model output is inherently limited by provider-side non-determinism — see the real, measured run-to-run and judge-repeatability variance in `docs/preliminary-results.md`.
+- The assurance layer (§8.4) is not a certification or regulatory approval.
 
 ---
 
@@ -816,7 +830,11 @@ If new task folders appear they pick up automatically — the harness discovers 
 - For the Python baseline submission, see [submissions/python-baseline/README.md](submissions/python-baseline/README.md).
 - For the per-run result format, see [results/README.md](results/README.md).
 - For the research framing, see [docs/research-problem.md](docs/research-problem.md).
-- For exactly what the proposal specifies vs. what's implemented, see [docs/dimension-mapping.md](docs/dimension-mapping.md).
+- For the formal evidence-traceability model and failure taxonomy, see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md).
+- For how gold evidence is/should be annotated, see [docs/evidence-annotation-protocol.md](docs/evidence-annotation-protocol.md).
+- For how the measurements themselves are validated, see [docs/validation-plan.md](docs/validation-plan.md).
+- For the planned controlled experimental programme, see [docs/experimental-design.md](docs/experimental-design.md).
+- For exactly what the research design specifies vs. what's implemented, see [docs/research-scope-mapping.md](docs/research-scope-mapping.md).
 - For reproducer flow, see [docs/reproduce.md](docs/reproduce.md).
 - For first cross-model and cross-language data, see [docs/preliminary-results.md](docs/preliminary-results.md).
 - For the rehearsed supervisor demo, see [docs/demo-script.md](docs/demo-script.md).

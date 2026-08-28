@@ -21,18 +21,19 @@ namespace AmlAgent.Agent;
 /// evidence citation, temporal reasoning, anomaly detection, fact/assumption
 /// separation, compliance tone, and absence of unsupported claims.
 ///
-/// It also computes the PhD proposal's two primary metrics on top of the
+/// It also computes the PhD's evidence-traceability measures on top of the
 /// rubric scores:
-///   - Evidence-Grounded Hallucination Rate (EGHR): the LLM extracts atomic
-///     claims and self-labels each as supported / unsupported / contradicted
-///     against the grounding data, but AmlAgent.Evidence.EvidenceScoring
-///     deterministically overrides any claim citing a nonexistent
-///     transaction ID to "unsupported" — the judge cannot inflate its own
-///     grounding.
-///   - Evidence traceability (citation precision/recall): computed entirely
-///     deterministically by regex-matching cited transaction IDs in the
-///     report against a curated gold-evidence set (rubric's
-//     "gold_evidence_annotations"), no LLM involved.
+///   - Evidence traceability (citation precision/recall) -- the PhD's sole
+///     primary metric: computed entirely deterministically by regex-matching
+///     cited transaction IDs in the report against a curated gold-evidence
+///     set (rubric's "gold_evidence_annotations"), no LLM involved.
+///   - Evidence-Grounded Hallucination Rate (EGHR) -- retained as a legacy/
+///     secondary metric (see docs/evidence-traceability-framework.md
+///     #legacy-eghr-metric): the LLM extracts atomic claims and self-labels
+///     each as supported / unsupported / contradicted against the grounding
+///     data, but AmlAgent.Evidence.EvidenceScoring deterministically
+///     overrides any claim citing a nonexistent transaction ID to
+///     "unsupported" -- the judge cannot inflate its own grounding.
 // </summary>
 internal static class JudgeAgent
 {
@@ -203,7 +204,7 @@ internal static class JudgeAgent
         parsed["model"] = model;
         parsed["judged_at_utc"] = DateTime.UtcNow.ToString("o");
 
-        // --- Primary metric 1: Evidence-Grounded Hallucination Rate ---
+        // --- Legacy/secondary metric: Evidence-Grounded Hallucination Rate ---
         var claimInputs = ParseClaimInputs(parsed["claims"]);
         var eghr = EvidenceScoring.ScoreClaims(claimInputs, validTxnIds);
         parsed["claims"] = ClaimsToJson(eghr.Claims);
@@ -218,7 +219,7 @@ internal static class JudgeAgent
             ["rate"] = eghr.Rate,
         };
 
-        // --- Primary metric 2: evidence traceability (citation precision/recall) ---
+        // --- Primary metric: evidence traceability (citation precision/recall) ---
         var traceability = EvidenceScoring.ComputeTraceability(evalBundle, validTxnIds, goldTxnIds);
         parsed["evidence_traceability"] = new JsonObject
         {

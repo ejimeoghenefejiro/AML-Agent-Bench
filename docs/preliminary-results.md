@@ -13,7 +13,7 @@ First live cross-model runs on Task 006 (`task-006-temporal-network-anomaly-dete
 > intended to evidence that the bench (a) functions end-to-end against live
 > LLMs and (b) discriminates meaningfully between model behaviours. They are
 > **not** a controlled comparative study — that work is the first empirical
-> objective of the PhD.
+> objective of the PhD (see [docs/experimental-design.md](experimental-design.md)).
 
 ## Headline
 
@@ -44,7 +44,7 @@ Observations:
 - Undercounted high-risk destinations (3 vs 6 in week 3).
 - Monotone increasing anomaly score, week 3 = 1.0000 — passes the strictly-increasing and `>= 0.7` tests.
 
-**LLM-judge per-dimension scores:**
+**LLM-judge per-dimension scores** (task-006's own 6-criterion evaluation rubric — a task-level scoring rubric, not the same "six" as the repository's earlier, now-retired six-dimension research framing; see [docs/research-scope-mapping.md](research-scope-mapping.md)):
 
 | Dimension | Score | Judge reasoning |
 |---|---|---|
@@ -80,9 +80,9 @@ Observations:
 ## What this preliminary data already tells us
 
 1. **The bench framework works end-to-end against live LLMs.** Both the autonomous `run` loop and the LLM-as-judge produce structured outputs on real model traffic.
-2. **The framework discriminates between models in a non-trivial way.** The "cheaper" model passed; the "stronger" model failed on a normalisation rule it forgot. This is the kind of qualitative finding that motivates the PhD's empirical objective.
+2. **The framework discriminates between models in a non-trivial way.** The "cheaper" model passed; the "stronger" model failed on a normalisation rule it forgot. This is the kind of qualitative finding that motivates the PhD's empirical objective (RQ3).
 3. **Operational friction is real and measurable.** OpenAI Tier-1 TPM (30 000 for gpt-4o, 200 000 for gpt-4o-mini) is the binding constraint on iteration speed for the stronger model. The harness already produces clean 429 traces — a useful side-result for any RegTech buyer considering production deployment.
-4. **The LLM-judge does not catch numeric errors that xUnit catches.** gpt-4o-mini's CSV had two undercount errors (SAR and high-risk-destination counts) that xUnit doesn't currently assert, and the LLM judge — looking at the markdown report — scored evidence-citation 5 / 5. This validates the **dual-evaluator design**: structural correctness and qualitative compliance writing are genuinely different signals.
+4. **The LLM-judge does not catch numeric errors that xUnit catches.** gpt-4o-mini's CSV had two undercount errors (SAR and high-risk-destination counts) that xUnit doesn't currently assert, and the LLM judge — looking at the markdown report — scored evidence-citation 5 / 5. This validates the **dual-evaluator design**: structural correctness and qualitative compliance writing are genuinely different signals, and it foreshadows the same divergence the evidence-traceability data point below makes explicit.
 
 ## Cross-language comparison (Docker harness, same prompt, same data)
 
@@ -112,45 +112,77 @@ be benchmarked against the same tasks as the C# / Semantic Kernel reference
 agent, and the framework yields differential signals along both deterministic
 and qualitative dimensions.
 
-## First EGHR and evidence-traceability data point (2026-08-07)
+## First evidence-traceability data point (2026-08-07)
 
-The first run of the proposal's two primary metrics — Evidence-Grounded
-Hallucination Rate (EGHR) and evidence-traceability citation precision/recall
-(see [docs/dimension-mapping.md](dimension-mapping.md)) — against a live
-`gpt-4o-mini` agent on Task 006, `--local` mode:
+The first run of the benchmark's deterministic evidence-traceability
+measures — citation precision/recall against a curated gold-evidence set,
+plus the legacy EGHR claim-support check (see
+[docs/evidence-traceability-framework.md](evidence-traceability-framework.md#legacy-eghr-metric))
+— against a live `gpt-4o-mini` agent on Task 006, `--local` mode:
 
 | Metric | Value | Detail |
 |---|---|---|
-| Six-dimension rubric | 24/30 = 80.0% | `evidence_citation: 3/5`, verdict PASS |
-| EGHR | **40.0%** | 2 unsupported + 0 contradicted / 5 extracted claims |
+| Task rubric (6-criterion) | 24/30 = 80.0% | `evidence_citation: 3/5`, verdict PASS |
+| EGHR (legacy) | **40.0%** | 2 unsupported + 0 contradicted / 5 extracted claims |
 | Evidence-traceability precision | **33.3%** | 1 of 3 grounded citations was gold evidence |
 | Evidence-traceability recall | **7.7%** | 1 of 13 gold-evidence transactions was cited |
 | Fabricated citations | 0 | No invented transaction IDs |
 
-This is a small but genuinely informative first data point: the six-dimension
-rubric — which asks an LLM to holistically rate "evidence citation" on a 0-5
-scale — passed the report at 80%. The proposal's actual primary metric,
-evidence-traceability recall, shows the report cited only 1 of the 13
-transactions that substantiate its own anomaly narrative (the SAR-linked and
-high-risk-destination transfers). The rubric score and the operationalised
-metric are telling meaningfully different stories about the same report,
-which is exactly the kind of divergence the PhD's RQ1 and RQ3 are designed to
-characterise systematically (rubric vs. metric validity; LLM-judge
-reliability). See the full `judge_report.json` fields in
-[docs/dimension-mapping.md](dimension-mapping.md) for the worked example.
+This is a small but genuinely informative first data point: the task's own
+6-criterion rubric — which asks an LLM to holistically rate "evidence
+citation" on a 0-5 scale — passed the report at 80%. The benchmark's
+operationalised evidence-traceability metric tells a materially different
+story: the report cited only 1 of the 13 transactions that substantiate its
+own anomaly narrative (the SAR-linked and high-risk-destination transfers).
+The rubric score and the deterministic metric are telling meaningfully
+different stories about the same report — exactly the kind of divergence
+this PhD's RQ2 (measurement and validation) and RQ3 (empirical variation)
+are designed to characterise systematically, and precisely the discriminant-
+validity question in [docs/validation-plan.md](validation-plan.md#discriminant-validity).
+See the full `judge_report.json` fields in
+[docs/research-scope-mapping.md](research-scope-mapping.md) for the worked
+example.
 
 This is one run, one model, one task — not a controlled study. Extending
-this to multiple seeds, models and both tasks is the natural next empirical
-step (see below).
+this to multiple seeds, models and tasks is the natural next empirical step
+(see below and [docs/experimental-design.md](experimental-design.md)).
+
+## First repeated-run and judge-repeatability data point (2026-08-09)
+
+A minimal (2-run) live demonstration of the repeated-run and judge-
+repeatability infrastructure (`aml-harness experiment repeat` /
+`experiment judge-repeat` — see `validation/experiments/README.md`), on
+task-006, `gpt-4o-mini`, `--local` mode:
+
+| Run | EGHR | Task rubric % | Assurance decision |
+|---|---|---|---|
+| Repeated run 1 | 0.3333 | 76.67% | NOT_READY_FOR_DEPLOYMENT |
+| Repeated run 2 | 0.5000 | 83.33% | NOT_READY_FOR_DEPLOYMENT |
+
+| Judge-repeat run (same fixed report, re-scored) | Overall % |
+|---|---|
+| 1 | 80.00% |
+| 2 | 76.67% |
+
+Two independent end-to-end runs of the identical task/agent/model
+configuration produced genuinely different EGHR and rubric scores; re-judging
+one **fixed** agent output twice with the same judge configuration also
+produced different scores. This is real, measured non-determinism — in both
+the agent and the judge — captured raw, with no consistency statistic
+computed from it yet (that is deliberately not yet defined; see
+[docs/experimental-design.md](experimental-design.md)). It is two runs, not a
+reliability study — but it is the first direct evidence that both halves of
+the pipeline vary run-to-run, which is exactly the kind of reliability
+question [docs/validation-plan.md](validation-plan.md#reliability) flags as
+still needing a statistically meaningful batch.
 
 ## Next empirical steps
 
-These results are first-data, not a controlled study. The PhD's first-year empirical objective is to extend this into:
+These results are first-data, not a controlled study. The PhD's first empirical objective is to extend this into:
 
-- Multiple seeds per (model, task) pair.
+- Multiple seeds per (model, task) pair, at a batch size large enough to say something about variance, using the runner infrastructure that already exists.
 - A broader model family sweep (Claude, Gemini, Llama, open-weights, plus tier-2 gpt-4o).
 - Variance and rank-correlation analysis between xUnit and LLM-judge.
 - Sensitivity analysis of the LLM-judge rubric and judge model.
 - Reproducibility tracking via per-call temperature seeding.
-
-A small `eval/` harness wrapping `aml-harness` for sweep execution and results aggregation is the natural next code artefact.
+- Extending evidence-traceability measurement to task-007's multi-source case, where citation coverage spans transaction, KYC, relationship, and watchlist evidence (see the documented gap in [docs/evidence-traceability-framework.md](evidence-traceability-framework.md#traceability-failure-taxonomy) — the current citation-extraction regex only recognises transaction-shaped ids).

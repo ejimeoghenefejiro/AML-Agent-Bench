@@ -144,10 +144,18 @@ internal static class AssuranceProfileBuilder
             ["deployment_restrictions"] = policy["deployment_restrictions_if_pass_with_conditions"]?.DeepClone(),
             ["evidence_summary"] = new JsonObject
             {
-                ["eghr"] = judge["eghr"]?.DeepClone(), // agent hallucination: unsupported/contradicted claims
+                ["eghr"] = judge["eghr"]?.DeepClone(), // legacy/secondary metric: unsupported/contradicted claims (see docs/evidence-traceability-framework.md#legacy-eghr-metric)
                 ["evidence_traceability"] = judge["evidence_traceability"]?.DeepClone(), // includes fabricated_citations and missing_gold_citations_list
                 ["claims"] = judge["claims"]?.DeepClone(),
             },
+            // Additive, backward-compatible re-organisation of the same measurements
+            // above around the traceability failure taxonomy (see
+            // AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder and
+            // docs/evidence-traceability-framework.md). Fields not yet
+            // computable (claim_support_coverage, evidence_sufficiency_rate)
+            // are explicit nulls, never fabricated.
+            ["evidence_traceability_profile"] = EvidenceTraceabilityProfileBuilder.Build(
+                judge["eghr"]?.AsObject(), judge["evidence_traceability"]?.AsObject()),
             ["case_evidence_integrity"] = caseIntegrity,
             ["provenance"] = new JsonObject
             {

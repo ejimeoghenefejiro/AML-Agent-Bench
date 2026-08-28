@@ -5,10 +5,11 @@ namespace AmlAgent.Tests;
 
 /// <summary>
 /// Unit tests for AmlAgent.Evidence.EvidenceScoring — the pure logic behind
-/// the PhD proposal's two primary metrics (EGHR and evidence traceability).
-/// Unlike the SkippableFact tests elsewhere in this project, these need no
-/// workspace, no LLM call and no OPENAI_API_KEY: they always run and are the
-/// fastest way to check the metric arithmetic is correct.
+/// evidence traceability (the PhD's primary metric) and the legacy EGHR
+/// claim-support check. Unlike the SkippableFact tests elsewhere in this
+/// project, these need no workspace, no LLM call and no OPENAI_API_KEY: they
+/// always run and are the fastest way to check the metric arithmetic is
+/// correct.
 /// </summary>
 public class EvidenceScoringTests
 {

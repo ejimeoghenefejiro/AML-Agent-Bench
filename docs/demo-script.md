@@ -63,9 +63,9 @@ evidence.
 
 Open: `C:\PHD\AML-Agent-Bench\Proposal\Oghenefejiro Ejime - PhD Research Proposal.pdf`.
 
-Or on screen, open the README's abstract section and read the primary
-research question (hallucination + evidence traceability) aloud, then the
-six-dimension table.
+Or on screen, open the README's abstract section and read the one-sentence
+definition aloud: whether an autonomous AML agent's conclusions can be
+reliably traced to the evidence that supports them.
 
 ### 2. "No-cost" sanity — the reference oracle (~10 s, zero risk)
 
@@ -101,7 +101,7 @@ next."*
 
 Let it run. The console prints the workspace path — copy it, you'll need it.
 
-### 4. The two primary metrics: EGHR and evidence traceability (~15 s)
+### 4. Evidence traceability: the primary metric (plus the legacy EGHR check) (~15 s)
 
 This is the headline. Point at these two lines in the console output
 regardless of what `OVERALL` said:
@@ -111,19 +111,19 @@ regardless of what `OVERALL` said:
 [judge] evidence traceability: precision=33.3% recall=7.7% (matched 1/13 gold citations)
 ```
 
-Talking point: *"This is the proposal's primary contribution, not the
-rubric. The judge extracted every atomic factual claim from the report and
-checked each one — any claim citing a transaction ID that doesn't exist in
-the source data is deterministically forced to 'unsupported', so the LLM
-can't inflate its own grounding. Separately, evidence traceability is
-computed with zero LLM involvement — regex citation extraction against a
-hand-curated gold-evidence set of the 13 transactions that actually
-substantiate this case's anomaly narrative. On this run, the six-dimension
-rubric gave 'evidence_citation' a 3 out of 5 — sounds fine — but the actual
-traceability recall shows the report cited only 1 of those 13 transactions.
-The rubric score and the operationalised metric are telling different
-stories about the same report. That gap is exactly what RQ1 and RQ3 are
-about."*
+Talking point: *"This is the PhD's primary contribution, not the rubric.
+Evidence traceability is computed with zero LLM involvement — regex citation
+extraction against a hand-curated gold-evidence set of the 13 transactions
+that actually substantiate this case's anomaly narrative. On this run, the
+task's own rubric gave 'evidence_citation' a 3 out of 5 — sounds fine — but
+the actual traceability recall shows the report cited only 1 of those 13
+transactions. The rubric score and the operationalised metric are telling
+different stories about the same report — exactly the discriminant-validity
+question this PhD's RQ2 and RQ3 are about. EGHR is the legacy check
+alongside it: the judge extracted every atomic factual claim from the report
+and checked each one — any claim citing a nonexistent transaction ID is
+deterministically forced to 'unsupported', so the LLM can't inflate its own
+grounding."*
 
 Open `<workspace>\judge_report.json` and scroll to the `"eghr"` and
 `"evidence_traceability"` objects to show the full structured output,

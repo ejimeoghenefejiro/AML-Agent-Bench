@@ -1,5 +1,18 @@
 # Assurance profile (prototype)
 
+## Positioning relative to the PhD
+
+**The PhD's doctoral core is measurement and validation of evidence
+traceability** (see [docs/research-problem.md](../docs/research-problem.md)
+and [docs/evidence-traceability-framework.md](../docs/evidence-traceability-framework.md)).
+This assurance layer is a **downstream application**, not part of that core:
+it shows one way traceability evidence (and the other metrics this benchmark
+computes) might be consumed by a model-governance or human-review process.
+It does not imply certification, regulatory approval, formal jurisdictional
+compliance, that a benchmark score alone determines safe deployment, or that
+unmeasured dimensions are passed — see [What this is not](#what-this-is-not-read-this-before-citing-it-anywhere)
+below, which this repositioning does not weaken.
+
 This folder is the first concrete step toward the long-term direction
 sketched in `Proposal/AML Agent Bench Real World Assurance Profile.txt`:
 evolving AML-Agent-Bench from a benchmark that prints PASS/FAIL into
@@ -134,8 +147,11 @@ tested) versus what isn't (the underlying LLM's own output).
   `not_evaluated_dimensions` with status `not_implemented`. **A generated
   profile never shows a fabricated PASS for a dimension that was not
   actually measured.** See
-  [docs/dimension-mapping.md](../docs/dimension-mapping.md) for the same
-  honesty accounting applied to the six PhD-proposal evaluation dimensions.
+  [docs/research-scope-mapping.md](../docs/research-scope-mapping.md) for the
+  same honesty accounting applied to the Evidence Traceability Profile's
+  components (EGHR is retained here as a legacy/secondary metric, not the
+  PhD's primary construct — see
+  [docs/evidence-traceability-framework.md](../docs/evidence-traceability-framework.md#legacy-eghr-metric)).
 - **`PASS_WITH_CONDITIONS` is the realistic ceiling today**, not `PASS`,
   precisely because five of nine dimensions are unmeasured. That is by
   design in `AssuranceEngine.Decide` — see its doc comment.

@@ -5,11 +5,13 @@ using System.Text.RegularExpressions;
 namespace AmlAgent.Evidence;
 
 /// <summary>
-/// Pure, dependency-free scoring logic for the two primary PhD-proposal
-/// metrics: Evidence-Grounded Hallucination Rate (EGHR) and evidence
-/// traceability (citation precision/recall). No LLM, network or file I/O
-/// happens in this class, so it is directly unit-testable without a
-/// workspace or an OPENAI_API_KEY.
+/// Pure, dependency-free scoring logic underlying evidence traceability
+/// (citation precision/recall) — the PhD's sole primary metric — and the
+/// legacy Evidence-Grounded Hallucination Rate (EGHR) claim-support check,
+/// retained as a secondary metric (see
+/// docs/evidence-traceability-framework.md#legacy-eghr-metric). No LLM,
+/// network or file I/O happens in this class, so it is directly
+/// unit-testable without a workspace or an OPENAI_API_KEY.
 ///
 /// Citation-existence checking (is a cited transaction ID real?) is always
 /// deterministic here — callers (e.g. the LLM-as-judge) cannot mark a
