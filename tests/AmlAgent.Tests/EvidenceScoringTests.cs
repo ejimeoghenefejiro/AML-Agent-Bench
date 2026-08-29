@@ -74,6 +74,86 @@ public class EvidenceScoringTests
         Assert.Null(result.Precision);
         Assert.Null(result.Recall);
         Assert.Null(result.F1);
+        Assert.Null(result.ValidEvidencePrecision);
+        Assert.Null(result.ValidEvidenceF1);
+    }
+
+    // -- Fix #4: precision has two defensible denominators when a report cites
+    // a fabricated id alongside real ones. Both are implemented, both are
+    // tested here independently, and neither is silently conflated with the
+    // other -- see docs/evidence-traceability-framework.md#evidence-precision-ep.
+
+    [Fact]
+    public void ComputeTraceability_Precision_StandardDefinition_IncludesFabricatedCitationsInDenominator()
+    {
+        // Standard IR precision: matched-gold / ALL distinct cited evidence,
+        // fabricated citations included. Matches the framework's own formal
+        // definition (EP_i = |E_i^agent ∩ E_i*| / |E_i^agent|, where E_i^agent
+        // is everything the agent cited, not a filtered subset of it).
+        var valid = new HashSet<string>(new[] { "T1-001", "T1-002" }, StringComparer.OrdinalIgnoreCase);
+        var gold = new HashSet<string>(new[] { "T1-001" }, StringComparer.OrdinalIgnoreCase);
+        var report = "N100 sent funds to M201 (T1-001), corroborated by T3-999.";
+
+        var result = EvidenceScoring.ComputeTraceability(report, valid, gold);
+
+        Assert.Equal(2, result.CitedDistinct);       // T1-001, T3-999
+        Assert.Equal(1, result.GroundedDistinct);    // T1-001 only
+        Assert.Single(result.FabricatedCitations);   // T3-999
+        Assert.Equal(1, result.MatchedGoldCitations);
+        Assert.Equal(0.5, result.Precision);         // 1 matched / 2 distinct cited (fabrication counted)
+    }
+
+    [Fact]
+    public void ComputeTraceability_ValidEvidencePrecision_ExcludesFabricatedCitationsFromDenominator()
+    {
+        // The metric's original formula, preserved under an explicit name:
+        // matched-gold / grounded (valid, real) citations only. A report that
+        // cites nothing but fabricated ids alongside its real, gold-matching
+        // citation still scores a perfect 1.0 here -- deliberately, since this
+        // metric is defined to be conditional on citations that are real.
+        var valid = new HashSet<string>(new[] { "T1-001", "T1-002" }, StringComparer.OrdinalIgnoreCase);
+        var gold = new HashSet<string>(new[] { "T1-001" }, StringComparer.OrdinalIgnoreCase);
+        var report = "N100 sent funds to M201 (T1-001), corroborated by T3-999.";
+
+        var result = EvidenceScoring.ComputeTraceability(report, valid, gold);
+
+        Assert.Equal(1.0, result.ValidEvidencePrecision); // 1 matched / 1 grounded
+    }
+
+    [Fact]
+    public void ComputeTraceability_AllCitationsFabricated_PrecisionIsZeroButValidEvidencePrecisionIsNull()
+    {
+        // A report citing ONLY fabricated ids is the case the two definitions
+        // diverge on most sharply: standard precision correctly reports 0.0
+        // (measurably bad), while valid-evidence precision has no valid
+        // citations to compute a ratio over at all, so it is null (undefined),
+        // not zero -- the two must not be confused with each other.
+        var valid = new HashSet<string>(new[] { "T1-001" }, StringComparer.OrdinalIgnoreCase);
+        var gold = new HashSet<string>(new[] { "T1-001" }, StringComparer.OrdinalIgnoreCase);
+        var report = "See T3-999 and T2-888, both invented.";
+
+        var result = EvidenceScoring.ComputeTraceability(report, valid, gold);
+
+        Assert.Equal(0, result.GroundedDistinct);
+        Assert.Equal(2, result.FabricatedCitations.Count);
+        Assert.Equal(0.0, result.Precision);
+        Assert.Null(result.ValidEvidencePrecision);
+    }
+
+    [Fact]
+    public void ComputeTraceability_NoFabrication_PrecisionAndValidEvidencePrecisionAreIdentical()
+    {
+        // When nothing is fabricated, grounded == cited distinct, so the two
+        // definitions must agree exactly -- they only diverge in the presence
+        // of fabricated citations, never otherwise.
+        var valid = new HashSet<string>(new[] { "T1-001", "T2-003", "T3-001" }, StringComparer.OrdinalIgnoreCase);
+        var gold = new HashSet<string>(new[] { "T2-003", "T3-001" }, StringComparer.OrdinalIgnoreCase);
+        var report = "See T1-001 and T2-003.";
+
+        var result = EvidenceScoring.ComputeTraceability(report, valid, gold);
+
+        Assert.Equal(result.Precision, result.ValidEvidencePrecision);
+        Assert.Equal(result.F1, result.ValidEvidenceF1);
     }
 
     [Fact]

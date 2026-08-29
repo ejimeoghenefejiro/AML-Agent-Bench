@@ -270,6 +270,16 @@ internal static class JudgeAgent
             ["precision"] = traceability.Precision,
             ["recall"] = traceability.Recall,
             ["f1"] = traceability.F1,
+            // Fix #4: precision has two defensible denominators when a report
+            // cites a fabricated id alongside real ones -- see
+            // docs/evidence-traceability-framework.md#evidence-precision-ep.
+            // "precision"/"f1" above are the primary, standard-IR-definition
+            // metric (fabricated citations count against the denominator).
+            // These two preserve the metric's original formula (real
+            // citations only) under an explicit name, for anyone who wants
+            // precision reported independently of fabrication.
+            ["valid_evidence_precision"] = traceability.ValidEvidencePrecision,
+            ["valid_evidence_f1"] = traceability.ValidEvidenceF1,
         };
 
         var outPath = Path.Combine(workspace, "judge_report.json");

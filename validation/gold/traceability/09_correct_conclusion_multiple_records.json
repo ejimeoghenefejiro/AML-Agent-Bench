@@ -2,13 +2,26 @@
   "scenario": "correct_conclusion_multiple_records",
   "description": "One conclusion supported by two separate gold-relevant transactions -- both should be fully credited.",
   "report_text": "M301 aggregated funds from two mule accounts, evidenced by T1-003 and T1-004.",
-  "valid_txn_ids": ["T1-003", "T1-004"],
-  "gold_txn_ids": ["T1-003", "T1-004"],
+  "valid_txn_ids": [
+    "T1-003",
+    "T1-004"
+  ],
+  "gold_txn_ids": [
+    "T1-003",
+    "T1-004"
+  ],
   "expected": {
-    "cited_total": 2, "cited_distinct": 2,
+    "cited_total": 2,
+    "cited_distinct": 2,
     "fabricated_citations": [],
     "grounded_distinct": 2,
-    "gold_total": 2, "matched_gold_citations": 2, "missing_gold_citations_list": [],
-    "precision": 1.0, "recall": 1.0, "f1": 1.0
+    "gold_total": 2,
+    "matched_gold_citations": 2,
+    "missing_gold_citations_list": [],
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "valid_evidence_precision": 1.0,
+    "valid_evidence_f1": 1.0
   }
 }

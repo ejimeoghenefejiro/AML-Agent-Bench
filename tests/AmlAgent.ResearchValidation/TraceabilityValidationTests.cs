@@ -55,6 +55,16 @@ public class TraceabilityValidationTests
         AssertNullableEqual(expected["precision"], result.Precision, $"[{scenario}] precision");
         AssertNullableEqual(expected["recall"], result.Recall, $"[{scenario}] recall");
         AssertNullableEqual(expected["f1"], result.F1, $"[{scenario}] f1");
+
+        // Fix #4: valid_evidence_precision/valid_evidence_f1 are optional in
+        // older fixtures (absent means "not asserted here", not "expected
+        // null" -- unlike precision/recall/f1 above, which every fixture has
+        // always carried). Every fixture written after this fix's tests were
+        // added below carries these explicitly.
+        if (expected.ContainsKey("valid_evidence_precision"))
+            AssertNullableEqual(expected["valid_evidence_precision"], result.ValidEvidencePrecision, $"[{scenario}] valid_evidence_precision");
+        if (expected.ContainsKey("valid_evidence_f1"))
+            AssertNullableEqual(expected["valid_evidence_f1"], result.ValidEvidenceF1, $"[{scenario}] valid_evidence_f1");
     }
 
     private static void AssertNullableEqual(JsonNode? expectedNode, double? actual, string context)
@@ -90,19 +100,31 @@ public class TraceabilityValidationTests
     // -- Focused pins on the two flagged definitional gaps --
 
     [Fact]
-    public void FabricatedCitation_DoesNotReducePrecisionOrRecall()
+    public void FabricatedCitation_ReducesStandardPrecisionButNotValidEvidencePrecisionOrRecall()
     {
-        // Pins the finding in 04_fabricated_evidence_ids.json: precision's
-        // denominator excludes fabricated citations entirely, so fabrication is
-        // invisible to precision/recall/F1 and only shows up in FabricatedCitations.
+        // Pins the resolution of the finding in 04_fabricated_evidence_ids.json
+        // (fix #4): the metric now reports precision two ways rather than
+        // silently picking one. Standard precision (Precision/F1) counts
+        // fabricated citations against the denominator, so it DOES drop when
+        // an agent fabricates evidence. ValidEvidencePrecision/ValidEvidenceF1
+        // preserve the original "conditional on real citations only" formula,
+        // so THOSE stay unaffected by fabrication -- exactly as before this
+        // fix, just under an explicit name instead of the plain "precision"
+        // field. Recall is unaffected either way (fabricated ids can never be
+        // gold, so they never touch the recall denominator or numerator).
         var withoutFabrication = EvidenceScoring.ComputeTraceability(
             "T1-001", new HashSet<string> { "T1-001" }, new HashSet<string> { "T1-001" });
         var withFabrication = EvidenceScoring.ComputeTraceability(
             "T1-001 and T3-999", new HashSet<string> { "T1-001" }, new HashSet<string> { "T1-001" });
 
-        Assert.Equal(withoutFabrication.Precision, withFabrication.Precision);
+        Assert.Equal(withoutFabrication.ValidEvidencePrecision, withFabrication.ValidEvidencePrecision);
+        Assert.Equal(withoutFabrication.ValidEvidenceF1, withFabrication.ValidEvidenceF1);
         Assert.Equal(withoutFabrication.Recall, withFabrication.Recall);
         Assert.Single(withFabrication.FabricatedCitations);
+
+        Assert.Equal(1.0, withoutFabrication.Precision);
+        Assert.Equal(0.5, withFabrication.Precision); // 1 matched / 2 distinct cited (fabrication counted)
+        Assert.True(withFabrication.Precision < withoutFabrication.Precision);
     }
 
     [Fact]

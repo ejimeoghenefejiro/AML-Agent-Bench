@@ -2,15 +2,33 @@
   "scenario": "missing_evidence",
   "description": "Report cites nothing at all -- no evidence for any of the three gold-relevant transactions.",
   "report_text": "Funds moved through several accounts before exiting the network.",
-  "valid_txn_ids": ["T1-001", "T1-002", "T1-003"],
-  "gold_txn_ids": ["T1-001", "T1-002", "T1-003"],
+  "valid_txn_ids": [
+    "T1-001",
+    "T1-002",
+    "T1-003"
+  ],
+  "gold_txn_ids": [
+    "T1-001",
+    "T1-002",
+    "T1-003"
+  ],
   "expected": {
-    "cited_total": 0, "cited_distinct": 0,
+    "cited_total": 0,
+    "cited_distinct": 0,
     "fabricated_citations": [],
     "grounded_distinct": 0,
-    "gold_total": 3, "matched_gold_citations": 0,
-    "missing_gold_citations_list": ["T1-001", "T1-002", "T1-003"],
-    "precision": null, "recall": 0.0, "f1": null
+    "gold_total": 3,
+    "matched_gold_citations": 0,
+    "missing_gold_citations_list": [
+      "T1-001",
+      "T1-002",
+      "T1-003"
+    ],
+    "precision": null,
+    "recall": 0.0,
+    "f1": null,
+    "valid_evidence_precision": null,
+    "valid_evidence_f1": null
   },
   "flag": "Precision is null (undefined, 0/0), not 0.0, when nothing is cited at all -- mathematically defensible, but note the asymmetry with recall, which is a well-defined 0.0 (0 matched / 3 gold). Under AssuranceEngine.EvaluateMetric, a null metric value evaluates as NOT_EVALUATED rather than FAIL, so a policy threshold on precision would silently skip this run rather than flag it as a precision failure -- only the recall threshold (and fabricated/EGHR metrics) would catch a completely uncited report. Worth confirming any assurance policy that only gates on precision, not recall, would miss this failure mode entirely."
 }

@@ -158,6 +158,7 @@ internal static class ExperimentRepeatCommand
             record["fabricated_citation_count"] = Find("fabricated_citation_count");
             var trace = profile?["evidence_summary"]?["evidence_traceability"];
             record["traceability_precision"] = (double?)trace?["precision"];
+            record["traceability_valid_evidence_precision"] = (double?)trace?["valid_evidence_precision"];
             record["traceability_recall"] = (double?)trace?["recall"];
             record["cited_evidence_ids"] = trace?["grounded_citations"]?.DeepClone();
         }

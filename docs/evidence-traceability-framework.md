@@ -86,6 +86,17 @@ The existing "fabricated citation count" is retained as a complementary raw fail
 
 At claim level: `EP_i = |E_i^agent ∩ E_i*| / |E_i^agent|`. Report-level (micro) precision, the currently-implemented form, aggregates over all cited evidence in the report rather than per claim — the two are conceptually distinct and both are useful; they are labelled separately, never conflated.
 
+**Two denominators, both reported, neither silent (fix #4).** `E_i^agent` in the formula above is *everything the agent cited* — it does not say "everything the agent validly cited". A report that cites a fabricated id alongside real ones is exactly the case where two readings of "precision" diverge, and the metric now computes both rather than picking one implicitly:
+
+| Field (`evidence_traceability` / `TraceabilityResult`) | Denominator | Behaviour under fabrication |
+|---|---|---|
+| `precision` / `f1` (primary) | ALL distinct cited evidence, fabricated included | Degrades — a fabricated citation lowers precision, matching the formula above literally and the standard IR definition of precision |
+| `valid_evidence_precision` / `valid_evidence_f1` | Grounded (real) citations only | Unaffected — fabrication is invisible to it by design, since the denominator excludes fabricated citations entirely |
+
+Before this fix, only the second behaviour existed and was reported under the plain name `precision` — [validation/gold/traceability/04_fabricated_evidence_ids.json](../validation/gold/traceability/04_fabricated_evidence_ids.json) is the fixture that first surfaced this as worth resolving rather than leaving implicit. Both formulas are implemented, both are pinned by tests on both sides of the divergence (`tests/AmlAgent.Tests/EvidenceScoringTests.cs`, `tests/AmlAgent.ResearchValidation/TraceabilityValidationTests.cs`, `tests/AmlAgent.ResearchValidation/DiscriminationValidationTests.cs`), and neither is derivable from the other without also knowing `fabricated_citations`/`grounded_citations`. **`precision` is the metric to cite as the PhD's primary reported number** (it matches the framework's own formal EP definition and cannot be gamed by fabricating plausible-looking evidence); `valid_evidence_precision` exists for anyone who deliberately wants precision reported conditional on non-fabricated citations, and must always be read alongside `fabricated_citations`/`invalid_reference_count` (RVR), never alone, since a perfect `valid_evidence_precision` says nothing about whether the report also fabricated evidence.
+
+One edge case worth being explicit about: a report citing *only* fabricated ids scores `precision = 0.0` (well-defined — it cited things, none were real or gold) but `valid_evidence_precision = null` (undefined — there is no grounded citation to compute a ratio over). `null` here means "no denominator", not "no evidence found"; do not read it as zero.
+
 ### Evidence Recall (ER)
 
 At claim level: `ER_i = |E_i^agent ∩ E_i*| / |E_i*|`. Same micro/macro distinction as precision.

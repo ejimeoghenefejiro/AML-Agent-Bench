@@ -193,6 +193,7 @@ public static class EvidenceScoring
 
         int matched = 0;
         double? precision = null, recall = null, f1 = null;
+        double? validEvidencePrecision = null, validEvidenceF1 = null;
         var matchedList = new List<string>();
         var missingList = new List<string>();
         var goldList = goldIds is null
@@ -206,10 +207,27 @@ public static class EvidenceScoring
             missingList = goldIds.Where(id => !grounded.Contains(id))
                 .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
             matched = matchedList.Count;
-            precision = grounded.Count == 0 ? null : Math.Round((double)matched / grounded.Count, 4);
+
+            // Standard IR precision: matched / ALL distinct cited evidence,
+            // fabricated citations included in the denominator (matches the
+            // framework's own EP_i = |E_i^agent ∩ E_i*| / |E_i^agent| formula,
+            // where E_i^agent is everything cited, not a pre-filtered subset).
+            // Defined (not null) even when every citation is fabricated -- a
+            // report citing nothing real correctly scores 0.0, not "N/A".
+            precision = citedDistinct.Count == 0 ? null : Math.Round((double)matched / citedDistinct.Count, 4);
             recall = goldIds.Count == 0 ? null : Math.Round((double)matched / goldIds.Count, 4);
             if (precision is double p && recall is double r && (p + r) > 0)
                 f1 = Math.Round(2 * p * r / (p + r), 4);
+
+            // Valid-Evidence Precision: the metric's original formula,
+            // preserved under an explicit name -- matched / grounded (real)
+            // citations only, so fabrication is invisible to it by design.
+            // Null (not zero) when there are no valid citations to form a
+            // ratio over at all, distinguishing "no real evidence cited" from
+            // "real evidence cited but none of it was gold-relevant" (0.0).
+            validEvidencePrecision = grounded.Count == 0 ? null : Math.Round((double)matched / grounded.Count, 4);
+            if (validEvidencePrecision is double vep && recall is double vr && (vep + vr) > 0)
+                validEvidenceF1 = Math.Round(2 * vep * vr / (vep + vr), 4);
         }
 
         return new TraceabilityResult(
@@ -225,7 +243,9 @@ public static class EvidenceScoring
             MissingGoldCitationsList: missingList,
             Precision: precision,
             Recall: recall,
-            F1: f1);
+            F1: f1,
+            ValidEvidencePrecision: validEvidencePrecision,
+            ValidEvidenceF1: validEvidenceF1);
     }
 
     /// <summary>
@@ -283,7 +303,27 @@ public sealed record EghrResult(
     double Rate,
     IReadOnlyList<ClaimResult> Claims);
 
-/// <summary>Citation precision/recall/F1 of a report's evidence traceability.</summary>
+/// <summary>
+/// Citation precision/recall/F1 of a report's evidence traceability.
+///
+/// Precision has two defensible denominators when a report cites a
+/// fabricated id alongside real ones, and this type reports both rather than
+/// picking one silently (see docs/evidence-traceability-framework.md
+/// #evidence-precision-ep):
+///   - <see cref="Precision"/> / <see cref="F1"/>: standard IR definition,
+///     matched-gold over ALL distinct cited evidence (fabricated citations
+///     count against the denominator). This is the framework's primary
+///     reported metric and matches its own formal EP_i definition.
+///   - <see cref="ValidEvidencePrecision"/> / <see cref="ValidEvidenceF1"/>:
+///     matched-gold over grounded (real) citations only, so fabrication is
+///     invisible to it by design -- conditional on "given the citations that
+///     are real, how precise were they". Kept for anyone who wants precision
+///     reported independently of fabrication (which is separately visible via
+///     <see cref="FabricatedCitations"/>).
+/// Recall is unaffected either way: fabricated citations can never be gold,
+/// so they never change the recall denominator (goldIds) or numerator
+/// (matched).
+/// </summary>
 public sealed record TraceabilityResult(
     int CitedTotal,
     int CitedDistinct,
@@ -297,4 +337,6 @@ public sealed record TraceabilityResult(
     IReadOnlyList<string> MissingGoldCitationsList,
     double? Precision,
     double? Recall,
-    double? F1);
+    double? F1,
+    double? ValidEvidencePrecision = null,
+    double? ValidEvidenceF1 = null);

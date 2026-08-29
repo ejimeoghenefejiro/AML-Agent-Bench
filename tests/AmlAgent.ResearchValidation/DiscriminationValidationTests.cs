@@ -134,16 +134,25 @@ public class DiscriminationValidationTests
 
     [Theory]
     [MemberData(nameof(Tasks))]
-    public void FabricatedCitation_DegradesEghrButNotTraceability_ConfirmingTheFlaggedFinding(string task)
+    public void FabricatedCitation_DegradesEghrAndStandardPrecision_ButNotValidEvidencePrecisionOrRecall(string task)
     {
+        // Fix #4 resolved the finding this test used to confirm (that
+        // fabrication was invisible to precision/F1, not just EGHR): the
+        // metric now reports precision two ways. Standard Precision/F1 counts
+        // fabricated citations against the denominator, so it now DOES
+        // degrade here, same direction as EGHR. ValidEvidencePrecision/
+        // ValidEvidenceF1 preserve the original "real citations only" formula
+        // and are still unaffected by fabrication, by design -- see
+        // docs/evidence-traceability-framework.md#evidence-precision-ep.
         var fixtures = LoadTask(task);
         var perfect = fixtures["correct_answer_correct_evidence"];
         var fabricated = fixtures["correct_conclusion_fabricated_citation"];
 
         Assert.True(fabricated.Eghr.Rate > perfect.Eghr.Rate, $"[{task}] fabrication must degrade EGHR");
-        Assert.Equal(perfect.Trace.Precision, fabricated.Trace.Precision);
+        Assert.True(fabricated.Trace.Precision < perfect.Trace.Precision, $"[{task}] fabrication must degrade standard precision");
+        Assert.Equal(perfect.Trace.ValidEvidencePrecision, fabricated.Trace.ValidEvidencePrecision);
         Assert.Equal(perfect.Trace.Recall, fabricated.Trace.Recall);
-        Assert.Equal(perfect.Trace.F1, fabricated.Trace.F1);
+        Assert.Equal(perfect.Trace.ValidEvidenceF1, fabricated.Trace.ValidEvidenceF1);
     }
 
     [Theory]

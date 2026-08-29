@@ -783,6 +783,8 @@ public static class Program
         if (trace is not null)
         {
             rows.Add(new[] { "Evidence traceability precision", FormatPercentOrNa(trace["precision"]) });
+            if (trace["valid_evidence_precision"] is not null)
+                rows.Add(new[] { "  (valid-evidence precision, fabrication excluded)", FormatPercentOrNa(trace["valid_evidence_precision"]) });
             var goldTotal = (int?)trace["gold_evidence_total"] ?? 0;
             var matched = (int?)trace["matched_gold_citations"] ?? 0;
             rows.Add(new[] { "Evidence traceability recall", $"{FormatPercentOrNa(trace["recall"])} ({matched}/{goldTotal} gold citations)" });
@@ -908,9 +910,11 @@ public static class Program
             new[] { "Fabricated citations", $"{fabricated.Count}" },
             new[] { "Gold-evidence set size", $"{(int?)trace["gold_evidence_total"] ?? 0}" },
             new[] { "Matched gold citations", $"{(int?)trace["matched_gold_citations"] ?? 0}" },
-            new[] { "Precision = matched / grounded citations", FormatPercentOrNa(trace["precision"]) },
+            new[] { "Precision = matched / ALL distinct cited (fabrication counts against it)", FormatPercentOrNa(trace["precision"]) },
             new[] { "Recall = matched / gold-evidence size", FormatPercentOrNa(trace["recall"]) },
             new[] { "F1", FormatPercentOrNa(trace["f1"]) },
+            new[] { "Valid-evidence precision = matched / grounded (real) citations only", FormatPercentOrNa(trace["valid_evidence_precision"]) },
+            new[] { "Valid-evidence F1", FormatPercentOrNa(trace["valid_evidence_f1"]) },
         });
     }
 

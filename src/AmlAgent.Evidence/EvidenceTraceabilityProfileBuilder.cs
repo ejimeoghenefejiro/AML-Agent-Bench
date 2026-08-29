@@ -105,6 +105,13 @@ public static class EvidenceTraceabilityProfileBuilder
             ["evidence_precision"] = evidenceTraceability?["precision"]?.DeepClone(),
             ["evidence_recall"] = evidenceTraceability?["recall"]?.DeepClone(),
             ["evidence_traceability_f1"] = evidenceTraceability?["f1"]?.DeepClone(),
+            // Fix #4: evidence_precision/evidence_traceability_f1 above use the
+            // standard-IR definition (fabricated citations count against the
+            // denominator). These two preserve the metric's original formula
+            // (matched over real/grounded citations only) under an explicit
+            // name -- see docs/evidence-traceability-framework.md#evidence-precision-ep.
+            ["valid_evidence_precision"] = evidenceTraceability?["valid_evidence_precision"]?.DeepClone(),
+            ["valid_evidence_f1"] = evidenceTraceability?["valid_evidence_f1"]?.DeepClone(),
             ["claim_support_coverage"] = claimLevel?.ClaimSupportCoverage, // report-level micro precision/recall above; claim-level (macro) below -- see docs/evidence-traceability-framework.md
             ["claim_level_precision"] = claimLevel?.MacroPrecision,
             ["claim_level_recall"] = claimLevel?.MacroRecall,
