@@ -134,7 +134,12 @@ public static class EvidenceTraceabilityProfileBuilder
                 ["precision"] = s.Precision,
                 ["recall"] = s.Recall,
             }).ToArray()),
-            ["evidence_sufficiency_rate"] = null, // not yet implemented -- requires validated sufficiency annotation
+            // Deliberately null (fix #8): the annotation schema and loader now exist
+            // (AmlAgent.Evidence.SufficiencyAnnotationReader, validation/gold/sufficiency/)
+            // but no real, validated human sufficiency annotation round has happened
+            // yet -- this stays null until one has, not the moment a schema exists to
+            // receive one. See docs/evidence-annotation-protocol.md#evidence-sufficiency-annotation-schema.
+            ["evidence_sufficiency_rate"] = null,
             ["reconstruction_success"] = null, // not yet implemented -- no per-claim reconstruction check exists for agent output yet
             ["run_reproducibility_note"] = "Deterministic scoring (this profile, EGHR, traceability, policy evaluation) is exactly repeatable given identical inputs -- see AmlAgent.ResearchValidation.DeterminismTests. The underlying LLM's own output is not deterministic; use `aml-harness experiment repeat`/`experiment judge-repeat` to measure that separately, not this field.",
             ["invalid_reference_count"] = fabricatedCount,

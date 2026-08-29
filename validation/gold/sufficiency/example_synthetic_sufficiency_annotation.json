@@ -1,0 +1,77 @@
+{
+  "_comment": "SYNTHETIC TEST FIXTURE ONLY -- not real human annotation data. Used solely to exercise SufficiencyAnnotationReader in tests/AmlAgent.Tests/SufficiencyAnnotationTests.cs. See README.md in this directory. Claim ids (MC1-MC6) match tasks/task-007-multi-source-mule-network/evidence-annotations.json's material_claims (fix #7); this fixture illustrates what a real sufficiency annotation round over that task's candidate outputs might look like, it does not drive any computed metric.",
+  "case_id": "task-007-case-001",
+  "output_id": "agent-output-003",
+  "annotators": [
+    {
+      "annotator_id": "H01",
+      "claim_sufficiency": [
+        {
+          "claim_id": "MC1",
+          "sufficiency_label": "sufficient",
+          "minimum_sufficient_evidence_sets": [["T1-001", "T1-002"], ["R1", "R2"]],
+          "rationale": "Both outbound transfers from N100 are cited; that alone establishes N100 as the funds' origin, which is all the claim asserts."
+        },
+        {
+          "claim_id": "MC3",
+          "sufficiency_label": "insufficient",
+          "minimum_sufficient_evidence_sets": [["T1-003", "T1-004"]],
+          "rationale": "The output cites only T1-003 (the M201->M301 hop) for the aggregation claim, but the claim asserts funds arrived from BOTH M201 and M202 -- the M202->M301 leg (T1-004) is also required to establish 'aggregator', not just 'recipient of one mule's funds'."
+        },
+        {
+          "claim_id": "MC4",
+          "sufficiency_label": "sufficient",
+          "minimum_sufficient_evidence_sets": [["WATCHLIST1"], ["R6"]],
+          "rationale": "The watchlist relationship edge alone is adequate to establish independent corroboration -- no transaction evidence is needed for this specific claim."
+        },
+        {
+          "claim_id": "MC5",
+          "sufficiency_label": "overbroad",
+          "minimum_sufficient_evidence_sets": null,
+          "rationale": "The output asserts the offshore beneficiary is confirmed to be complicit in the fraud, which T2-001 alone cannot establish -- T2-001 shows funds moved to EXT401, not that EXT401 itself is a knowing participant. The claim as worded exceeds what any evidence in this case could support; this is a wording problem, not a missing-citation problem, hence 'overbroad' rather than 'insufficient'."
+        },
+        {
+          "claim_id": "MC6",
+          "sufficiency_label": "sufficient",
+          "minimum_sufficient_evidence_sets": [["T1-005"], ["R7"]],
+          "rationale": "T1-005 alone, combined with the report's stated reasoning about timing predating compromise, is adequate to support clearing N150 -- no further evidence is needed for a clearing claim of this kind."
+        }
+      ]
+    },
+    {
+      "annotator_id": "H02",
+      "claim_sufficiency": [
+        {
+          "claim_id": "MC1",
+          "sufficiency_label": "sufficient",
+          "minimum_sufficient_evidence_sets": [["T1-001", "T1-002"]],
+          "rationale": "Agrees with H01."
+        },
+        {
+          "claim_id": "MC3",
+          "sufficiency_label": "insufficient",
+          "minimum_sufficient_evidence_sets": [["T1-003", "T1-004"]],
+          "rationale": "Agrees with H01 -- one leg alone does not establish aggregation from both sources."
+        },
+        {
+          "claim_id": "MC4",
+          "sufficiency_label": "sufficient",
+          "minimum_sufficient_evidence_sets": [["WATCHLIST1"]],
+          "rationale": "Agrees with H01."
+        },
+        {
+          "claim_id": "MC5",
+          "sufficiency_label": "insufficient",
+          "minimum_sufficient_evidence_sets": [["T2-001"]],
+          "rationale": "Disagrees with H01's 'overbroad' label -- reads the claim as only asserting the exit transfer occurred, which T2-001 alone does establish; the complicity framing H01 flagged is present in the report's tone, not in this specific claim's text. Illustrates exactly the kind of annotator disagreement inter-rater agreement work is meant to surface, not paper over."
+        },
+        {
+          "claim_id": "MC6",
+          "sufficiency_label": "sufficient",
+          "minimum_sufficient_evidence_sets": [["T1-005"]],
+          "rationale": "Agrees with H01."
+        }
+      ]
+    }
+  ]
+}

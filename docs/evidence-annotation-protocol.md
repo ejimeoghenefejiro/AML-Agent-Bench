@@ -72,4 +72,36 @@ The protocol does not assume every claim has one unique correct evidence set. Th
 - **optional corroborating evidence** — strengthens but is not required for the claim to be considered supported;
 - **minimum sufficient evidence combinations** — the smallest sets of records that jointly satisfy sufficiency.
 
-This is a meaningful improvement over flat set comparison (today's `gold_evidence_txn_ids: [...]` list, which implicitly treats every gold id as equally mandatory). The data model and scoring for it are implemented — `AmlAgent.Evidence.ReferenceEvidence` (`Required`/`AcceptableAlternatives`/`Corroborating`) and `ClaimLevelScoring`, see [docs/research-scope-mapping.md](research-scope-mapping.md#planned-claim-level-schema) — but no task has real claim-level annotations using it yet; that's the concrete next step, not a code gap.
+This is a meaningful improvement over flat set comparison (today's `gold_evidence_txn_ids: [...]` list, which implicitly treats every gold id as equally mandatory). The data model and scoring for it are implemented — `AmlAgent.Evidence.ReferenceEvidence` (`Required`/`AcceptableAlternatives`/`Corroborating`) and `ClaimLevelScoring`, see [docs/research-scope-mapping.md](research-scope-mapping.md#planned-claim-level-schema). As of fix #7, `tasks/task-007-multi-source-mule-network/evidence-annotations.json` has real, single-author `material_claims` using this model (six claims, each with `required`/`acceptable_alternatives`) — task-006 still doesn't, and neither task's annotations are yet multi-annotator or adjudicated (see [Current status](#current-status-read-this-first) above).
+
+## Evidence Sufficiency Rate annotation schema
+
+**Schema and fixtures exist; no real annotation round has happened, and `evidence_sufficiency_rate` stays `null` in every actual run (fix #8).** Sufficiency is a materially harder annotation question than support/necessity above: a claim's cited evidence can be entirely valid and even individually relevant, yet still inadequate for the claim's scope and strength (the "insufficient" case — e.g. one leg of a three-hop layering chain) or the claim itself can be worded more broadly than any available evidence could establish (the "overbroad" case — question 6 in Annotation questions above). Both require a human or domain-expert judgement call this benchmark does not make on its own, and should not fabricate a number for.
+
+The schema — `AmlAgent.Evidence.SufficiencyAnnotationReader` (`src/AmlAgent.Evidence/SufficiencyAnnotation.cs`) — mirrors `HumanAnnotationReader`'s shape and strictness deliberately, since both read the same class of not-yet-collected human data:
+
+```json
+{
+  "case_id": "task-007-case-001",
+  "output_id": "agent-output-003",
+  "annotators": [
+    {
+      "annotator_id": "H01",
+      "claim_sufficiency": [
+        {
+          "claim_id": "MC3",
+          "sufficiency_label": "insufficient",
+          "minimum_sufficient_evidence_sets": [["T1-003", "T1-004", "T2-001"]],
+          "rationale": "One leg of the transfer chain does not establish the full layering claim."
+        }
+      ]
+    }
+  ]
+}
+```
+
+`sufficiency_label` is one of `sufficient` / `insufficient` / `overbroad` (validated by the reader; any other value throws rather than being silently accepted). `minimum_sufficient_evidence_sets` is optional — an annotator judging a claim already-sufficient may have no need to construct a counterfactual minimal set.
+
+`validation/gold/sufficiency/example_synthetic_sufficiency_annotation.json` is a synthetic fixture (never presented as real data) exercising this schema against task-007's six real `material_claims` ids from fix #7, including a deliberate genuine disagreement between its two synthetic annotators on one claim — illustrating exactly the kind of case a real inter-rater agreement study needs to surface, not paper over. See `tests/AmlAgent.ResearchValidation/SufficiencyAnnotationTests.cs` for the tests exercising the loader, and `validation/gold/sufficiency/README.md` for the fixture-directory-level statement of what is and is not real data here.
+
+**What this deliberately does not do:** no code anywhere computes `evidence_sufficiency_rate` from this schema, or from anything else. `AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder.Build` keeps it an explicit `null`. The concrete next steps, in order, are: (1) a real annotation round using this schema against real candidate outputs, by more than one annotator; (2) inter-rater agreement measurement (see [Multi-annotator validation](#multi-annotator-validation) above); (3) only once that validation exists, a scoring implementation — in that order, not implementation first and validation as an afterthought.
