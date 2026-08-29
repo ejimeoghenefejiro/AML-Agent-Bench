@@ -4,6 +4,11 @@
   "gold_evidence_txn_ids": [
     "T1-001", "T1-002", "T1-003", "T1-004", "T2-001"
   ],
+  "gold_evidence_ids": [
+    "T1-001", "T1-002", "T1-003", "T1-004", "T2-001",
+    "R1", "R2", "R3", "R4", "R5", "R6", "WATCHLIST1"
+  ],
+  "gold_evidence_ids_note": "Generalises gold_evidence_txn_ids (kept for back-compat with the transaction-only judge path) to the full evidence universe this task actually depends on: R1-R5 are the relationship-graph hops mirroring each fraud transaction, R6 and WATCHLIST1 are the independent watchlist corroboration of M301 that the report's 'Watchlist corroboration' section specifically requires. Distractor evidence (T1-005, T2-002, R7) is deliberately excluded from gold -- a strong report may still mention them when explaining why N150/N160/N170 are cleared, but they are not part of the core fraud narrative precision/recall is scored against.",
   "typology": "Authorised push payment (APP) fraud: an elderly victim is socially engineered into transferring funds to freshly-opened mule accounts, which rapidly layer the funds through an aggregator account before exiting to an offshore beneficiary in a high-risk jurisdiction.",
   "victim_account_id": "N100",
   "mule_account_ids": ["M201", "M202", "M301"],

@@ -20,11 +20,11 @@ to what is implemented now, what is partial, and what is not started.
 
 | Research component | Current implementation | Limitation | Required PhD work |
 |---|---|---|---|
-| Reference validity (RVR) | Fabricated-citation detection implemented deterministically (`EvidenceScoring.ComputeTraceability`'s `FabricatedCitations`); RVR itself (as a named rate) not yet surfaced as its own field | Task-specific gold sets only; RVR isn't computed as a distinct rate in output today, only the raw fabricated-citation list/count | Surface RVR explicitly in the Evidence Traceability Profile output; generalise beyond the current two annotated tasks |
-| Evidence precision (EP) | Implemented, report-level (micro), for task-006 and task-007 | Flat gold set, report-level only — no claim-level precision yet | Claim-level EP + multi-annotator gold |
-| Evidence recall (ER) | Implemented, report-level (micro), for task-006 and task-007 | Same as precision | Claim-level ER + multi-annotator gold |
-| Evidence Traceability F1 (ETF1) | Implemented, aggregate only | Aggregate, not claim-level | Macro/micro and claim-level variants |
-| Claim support coverage (CSC) | **Not implemented** | — | Implement — needs material-claim identification methodology first |
+| Reference validity (RVR) | Implemented: `reference_validity_rate`, an explicit field in `evidence_traceability_profile` (`EvidenceTraceabilityProfileBuilder`), derived from `EvidenceScoring.ComputeTraceability`'s `FabricatedCitations` | Task-specific gold sets only | Generalise beyond the current two annotated tasks (task-006, task-007 — task-001 has no rubric/gold evidence at all) |
+| Evidence precision (EP) | Implemented at BOTH levels: report-level (micro, `evidence_precision`) for task-006/task-007, and claim-level (macro, `claim_level_precision`) via `ClaimLevelScoring.ComputeClaimLevelTraceability` — both real, tested, distinct fields | Claim-level EP needs real claim-level gold annotation to run against live data; today it only has synthetic test fixtures | Multi-annotator gold at claim level (see [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md)) |
+| Evidence recall (ER) | Same status as precision — report-level and claim-level both implemented (`evidence_recall`, `claim_level_recall`) | Same as precision | Multi-annotator gold at claim level |
+| Evidence Traceability F1 (ETF1) | Implemented at both levels (`evidence_traceability_f1` report-level, `claim_level_f1` claim-level macro) | Claim-level needs real annotation data to populate in a live run | Same as above |
+| Claim support coverage (CSC) | **Implemented**: `claim_support_coverage` field, `ClaimLevelScoring.ComputeClaimSupportCoverage` — see [docs/evidence-traceability-framework.md](evidence-traceability-framework.md#claim-support-coverage-csc) | Computable and tested, but no live task has claim-level annotations yet, so it's `null` in every actual run today | Extend the judge to emit `claim_id`/`material`/per-claim `agent_evidence`, and annotate at least one task's gold evidence at claim level |
 | Evidence sufficiency (ESR) | **Not implemented** | Inherently semantic, needs validated annotation | Define + validate against human judgement |
 | Traceability failure taxonomy | Partial — `invalid_reference`/`unsupported_claim`/`evidence_omission` deterministically detectable via EGHR's citation-existence override and gold-set comparison; `evidence_mismatch`/`insufficient_evidence`/`overcitation` need semantic judgement, not yet scored; `traceability_break` assessed for canonical case data (`EvidenceIntegrityValidator`), open question for agent-output side | EGHR-oriented; not yet reorganised into the full 7-type taxonomy in code | Refactor scoring output to emit typed `traceability_failures`, not just EGHR's supported/unsupported/contradicted buckets |
 | Provenance/reproducibility | Strong prototype — dataset/case hashing (`CanonicalHashing`), git SHA, benchmark version, format-invariance and source-order-invariance proven with real live-DB verification (`tests/AmlAgent.ResearchValidation/FormatInvarianceTests.cs`, `SourceOrderInvarianceTests.cs`), determinism explicitly tested (`DeterminismTests.cs`) | Versioning of the schema itself (not the data) is informal | Formalise schema versioning for `assurance_profile.json` / `case_manifest.json` |
@@ -48,7 +48,7 @@ to what is implemented now, what is partial, and what is not started.
 - **Judge-reliability controls** (RQ3): human-annotated validation subset, inter-rater agreement, position/verbosity/self-enhancement bias checks per Zheng et al. (2023). The judge-repeatability runner (`experiment judge-repeat`) exists and has captured real variance on a small demo; no human-agreement baseline exists yet.
 - **Multiple agent architectures** (RQ3/RQ4): today there is one architecture (C#/Semantic Kernel single-agent tool-calling loop) plus one cross-language baseline (Python ReAct) — both single-agent tool-use, no retrieval-augmented, evidence-constrained, or verifier-assisted variant yet.
 - **Public/synthetic research datasets:** AMLSim, NeurIPS synthetic AML data, Elliptic Bitcoin. Today's data is small, hand-authored synthetic CSV/JSON/Parquet built for determinism, not yet these datasets.
-- **Multi-source, multi-annotator gold evidence:** task-007's multi-source case (transactions + KYC + relationships + watchlist) exists and is structurally validated (`AmlAgent.Adapters.Canonical.EvidenceIntegrityValidator`), but its gold evidence set is still single-author, same limitation as task-006.
+- **Multi-source, multi-annotator gold evidence:** task-007's multi-source case (transactions + KYC + relationships + watchlist) exists and is structurally validated (`AmlAgent.Adapters.Canonical.EvidenceIntegrityValidator`), and its gold evidence set now spans evidence types (`gold_evidence_ids`: transaction, relationship, and watchlist ids, not just transactions), but it is still single-author and report-level (no claim-level annotation yet) — same annotator-count limitation as task-006.
 
 ## Why this gap is expected, not a problem
 
@@ -57,10 +57,11 @@ A working C#/Semantic Kernel agent, a polyglot Docker harness, a multi-format da
 ## Immediate next build priorities
 
 1. ~~Surface Reference Validity Rate as an explicit field~~ — **done**: `reference_validity_rate` in `evidence_traceability_profile` (`AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder`).
-2. Add claim-level evidence precision/recall/coverage (currently report-level/micro only).
-3. Execute a real, independent-annotator gold-evidence round for at least one task, to start convergent-validity work.
-4. Run `aml-harness experiment repeat` / `experiment judge-repeat` at a statistically meaningful batch size (the current live evidence is a 2-run proof of concept, not a reliability study).
-5. Build the noise/distractor task variants described in `docs/experimental-design.md` and `validation/experiments/README.md`.
+2. ~~Generalise evidence beyond transaction IDs~~ — **done**, including the live judge: `AmlAgent.Evidence.EvidenceReference` + `ComputeTraceability(string, IReadOnlyCollection<EvidenceReference>, ...)` recognise citations to any canonical evidence type (relationship, SAR, watchlist, account, entity, ...), not just transactions, and `agents/csharp-sk/Agent/JudgeAgent.cs` now reloads a workspace's `case-definition.json` (when present) to score task-007 against that full universe instead of flat transaction-id grounding files — see [docs/evidence-traceability-framework.md](evidence-traceability-framework.md#evidence-node-realised-evidencereference). Task-006 and every task without a `case-definition.json` are unaffected (same flat-file path as before).
+3. Add claim-level evidence precision/recall/coverage (currently report-level/micro only, now generalised across evidence types but still report-level).
+4. Execute a real, independent-annotator gold-evidence round for at least one task, to start convergent-validity work.
+5. Run `aml-harness experiment repeat` / `experiment judge-repeat` at a statistically meaningful batch size (the current live evidence is a 2-run proof of concept, not a reliability study).
+6. Build the noise/distractor task variants described in `docs/experimental-design.md` and `validation/experiments/README.md`.
 
 ## Proposed version milestone
 
@@ -68,11 +69,15 @@ A working C#/Semantic Kernel agent, a polyglot Docker harness, a multi-format da
 
 ## Planned claim-level schema
 
-Sketch of the claim-level data model referenced from
-[docs/evidence-traceability-framework.md](evidence-traceability-framework.md#formal-claim-evidence-model)
-and [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md#multiple-valid-gold-handling)
-— **not yet implemented**, shown here so the shape is concrete rather than
-only described in prose:
+**Implemented as C# types** — `AmlAgent.Evidence.Claim` and `ReferenceEvidence`
+(see [docs/evidence-traceability-framework.md](evidence-traceability-framework.md#formal-claim-evidence-model)
+and [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md#multiple-valid-gold-handling)).
+The JSON shape below (what a `judge_report.json`/annotation file carrying this
+data would look like) matches the implemented model field-for-field, except
+`reference_valid`/`evidence_relevant`/`evidence_sufficient` are not yet
+separate output fields — `ClaimLevelScoring.Score`/`IsSupported` compute an
+equivalent judgement (`supported`, `precision`, `recall` per claim) rather
+than three separate booleans:
 
 ```json
 {
@@ -86,23 +91,21 @@ only described in prose:
         "required": ["T001"],
         "acceptable_alternatives": [["T003", "T004"]],
         "corroborating": ["T005"]
-      },
-      "reference_valid": true,
-      "evidence_relevant": true,
-      "evidence_sufficient": null
+      }
     }
   ]
 }
 ```
 
-Exact field names may change; the requirement this schema must satisfy is
-claim-level analysis with multiple acceptable evidence sets, which flat
-`gold_evidence_txn_ids` lists (today's actual format) cannot represent. The
-current `evidence_traceability_profile` block in `assurance_profile.json`
-(`AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder`) is report-level, not
-claim-level — it is the additive Phase B step described in this document's
-own "Immediate next build priorities" above; this claim-level schema is the
-Phase C step that has not been started.
+**What's still not implemented:** no code today PRODUCES this JSON shape from
+a live run. `judge_report.json`'s existing `claims` array (from the LLM
+judge's EGHR extraction) has no `claim_id`/`material`/`reference_evidence`.
+No task's `evidence-annotations.json` has real claim-level reference evidence
+annotated. `EvidenceTraceabilityProfileBuilder.Build`'s `claims` parameter
+(the wiring point for this data) is ready and tested, but has no live caller
+passing it yet — see [docs/evidence-traceability-framework.md](evidence-traceability-framework.md#formal-claim-evidence-model).
+Two concrete next steps close this: extend the judge to emit this shape, and
+annotate at least one task's gold evidence at claim level.
 
 ## Related work: the assurance-profile prototype
 

@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AmlAgent.Adapters;
+using AmlAgent.Adapters.Canonical;
 using AmlAgent.Evidence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -92,9 +94,36 @@ internal static class JudgeAgent
 
         // Deterministic grounding: the real transaction IDs and (optionally) a
         // curated gold-evidence subset, used to score EGHR and traceability
-        // independently of what the LLM claims.
-        var validTxnIds = ParseValidTxnIds(workspace, groundingInputs);
+        // independently of what the LLM claims. When the workspace carries a
+        // case-definition.json (multi-source tasks like task-007), the judge
+        // reloads it to get the FULL evidence universe -- accounts,
+        // relationships, watchlist entries, SARs, not just transactions --
+        // instead of only the txn_ids the flat grounding_inputs files expose.
+        // Absent for every task that predates this feature, so caseEvidence
+        // is null and every line below falls back to the original behaviour.
+        var caseEvidence = LoadCaseEvidenceIfPresent(workspace);
+        HashSet<string> validTxnIds;
+        IReadOnlyCollection<EvidenceReference>? validEvidenceRefs = null;
+        if (caseEvidence is not null)
+        {
+            validEvidenceRefs = caseEvidence;
+            validTxnIds = new HashSet<string>(caseEvidence.Select(e => e.EvidenceId), StringComparer.OrdinalIgnoreCase);
+        }
+        else
+        {
+            validTxnIds = ParseValidTxnIds(workspace, groundingInputs);
+        }
+
         var goldTxnIds = LoadGoldEvidence(rubricPath, rubric);
+        IReadOnlyCollection<EvidenceReference>? goldEvidenceRefs = null;
+        if (validEvidenceRefs is not null && goldTxnIds is not null)
+        {
+            var lookup = new Dictionary<string, EvidenceReference>(StringComparer.OrdinalIgnoreCase);
+            foreach (var reference in validEvidenceRefs) lookup.TryAdd(reference.EvidenceId, reference);
+            goldEvidenceRefs = goldTxnIds
+                .Select(id => lookup.TryGetValue(id, out var reference) ? reference : new EvidenceReference(id, "unknown"))
+                .ToList();
+        }
 
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? throw new InvalidOperationException("OPENAI_API_KEY is not set");
@@ -220,10 +249,14 @@ internal static class JudgeAgent
         };
 
         // --- Primary metric: evidence traceability (citation precision/recall) ---
-        var traceability = EvidenceScoring.ComputeTraceability(evalBundle, validTxnIds, goldTxnIds);
+        var traceability = validEvidenceRefs is not null
+            ? EvidenceScoring.ComputeTraceability(evalBundle, validEvidenceRefs, goldEvidenceRefs)
+            : EvidenceScoring.ComputeTraceability(evalBundle, validTxnIds, goldTxnIds);
         parsed["evidence_traceability"] = new JsonObject
         {
-            ["method"] = "deterministic_regex_citation_match",
+            ["method"] = validEvidenceRefs is not null
+                ? "deterministic_known_evidence_id_citation_match"
+                : "deterministic_regex_citation_match",
             ["cited_txn_ids_total"] = traceability.CitedTotal,
             ["cited_txn_ids_distinct"] = traceability.CitedDistinct,
             ["fabricated_citations"] = ToJsonArray(traceability.FabricatedCitations),
@@ -321,7 +354,11 @@ internal static class JudgeAgent
 
     /// <summary>
     /// Loads the rubric's optional "gold_evidence_annotations" file (a task-definition
-    /// file living next to rubric.json, not part of the staged workspace).
+    /// file living next to rubric.json, not part of the staged workspace). Unions
+    /// the legacy transaction-only field with the generalised "gold_evidence_ids"
+    /// field (any evidence type -- relationship, watchlist, SAR, ...), so a task
+    /// written before the generalised evidence model still works unchanged, and
+    /// a multi-source task like task-007 can annotate gold evidence beyond txn_ids.
     /// </summary>
     private static HashSet<string>? LoadGoldEvidence(string rubricPath, JsonNode rubric)
     {
@@ -333,10 +370,44 @@ internal static class JudgeAgent
         if (!File.Exists(full)) return null;
 
         var doc = JsonNode.Parse(File.ReadAllText(full));
-        var arr = doc?["gold_evidence_txn_ids"]?.AsArray();
-        if (arr is null) return null;
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var n in doc?["gold_evidence_txn_ids"]?.AsArray() ?? new JsonArray())
+            if (n is not null) ids.Add(n.GetValue<string>());
+        foreach (var n in doc?["gold_evidence_ids"]?.AsArray() ?? new JsonArray())
+            if (n is not null) ids.Add(n.GetValue<string>());
 
-        return new HashSet<string>(arr.Select(n => n!.GetValue<string>()), StringComparer.OrdinalIgnoreCase);
+        return ids.Count > 0 ? ids : null;
+    }
+
+    /// <summary>
+    /// Multi-source tasks stage a case-definition.json into the workspace
+    /// root (see AmlAgent.Harness.Program.StageCanonicalCaseIfPresent), which
+    /// the harness already used once to materialise workspace/data/*.csv|json
+    /// for the agent to read. The judge reloads that same case-definition.json
+    /// independently -- rather than re-parsing the exported flat files -- so it
+    /// gets typed EvidenceReferences for every canonical record (transactions,
+    /// accounts, relationships, watchlist entries, SARs, ...), not just the
+    /// txn_id column a flat CSV exposes. Returns null (never throws) for any
+    /// task without a case-definition.json, or one that fails to reload, so
+    /// callers fall back to the original flat-grounding-inputs path exactly as
+    /// before this feature existed.
+    /// </summary>
+    private static IReadOnlyList<EvidenceReference>? LoadCaseEvidenceIfPresent(string workspace)
+    {
+        var caseDefPath = Path.Combine(workspace, "case-definition.json");
+        if (!File.Exists(caseDefPath)) return null;
+
+        try
+        {
+            var definition = CaseDefinitionReader.Parse(File.ReadAllText(caseDefPath), caseDefPath, workspace);
+            var result = CaseLoader.LoadAsync(definition, AdapterRegistry.CreateDefault()).GetAwaiter().GetResult();
+            return result.MergedCase.ToEvidenceReferences();
+        }
+        catch (InvalidCaseDefinitionException ex)
+        {
+            Console.Error.WriteLine($"[judge]   invalid case-definition.json: {ex.Message} -- falling back to flat grounding_inputs");
+            return null;
+        }
     }
 
     private static List<ClaimInput> ParseClaimInputs(JsonNode? claimsNode)

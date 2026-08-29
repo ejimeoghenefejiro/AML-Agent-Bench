@@ -180,6 +180,53 @@ public class EvidenceTraceabilityProfileBuilderTests
     }
 
     [Fact]
+    public void Build_WithClaims_PopulatesClaimSupportCoverageAndMacroFields()
+    {
+        var claims = new[]
+        {
+            new Claim("C1", "text", Material: true, AgentEvidence: new[] { "T1-001" }, ReferenceEvidence: new ReferenceEvidence(Required: new[] { "T1-001" })),
+            new Claim("C2", "text", Material: true, AgentEvidence: new[] { "T2-001" }, ReferenceEvidence: new ReferenceEvidence(Required: new[] { "T1-002" })), // not supported
+        };
+
+        var profile = EvidenceTraceabilityProfileBuilder.Build(
+            Eghr(1, 1, 0, 0), Trace(1, new JsonArray(), new JsonArray(), 1.0, 1.0, 1.0), claims);
+
+        Assert.Equal(0.5, (double?)profile["claim_support_coverage"]);
+        Assert.NotNull(profile["claim_level_precision"]);
+        Assert.Equal(2, profile["claim_scores"]!.AsArray().Count);
+    }
+
+    [Fact]
+    public void Build_WithClaims_UnsupportedClaim_RecordedAsInsufficientEvidenceFailure()
+    {
+        var claims = new[]
+        {
+            new Claim("C1", "text", Material: true, AgentEvidence: new[] { "T2-001" }, ReferenceEvidence: new ReferenceEvidence(Required: new[] { "T1-002" })),
+        };
+
+        var profile = EvidenceTraceabilityProfileBuilder.Build(null, null, claims);
+
+        var insufficient = profile["traceability_failures"]!.AsArray()
+            .Where(f => (string?)f!["failure_type"] == "insufficient_evidence").ToList();
+        Assert.Single(insufficient);
+        Assert.Equal("C1", (string?)insufficient[0]!["claim_id"]);
+    }
+
+    [Fact]
+    public void Build_NoClaimsArgument_ClaimLevelFieldsAllNull_DefaultBehaviourUnchanged()
+    {
+        // Confirms the optional parameter's default preserves the exact
+        // pre-existing behaviour for callers that don't pass it (e.g. the
+        // current live AssuranceProfileBuilder.cs call site).
+        var profile = EvidenceTraceabilityProfileBuilder.Build(Eghr(1, 1, 0, 0), Trace(1, new JsonArray(), new JsonArray(), 1.0, 1.0, 1.0));
+
+        Assert.Null(profile["claim_level_precision"]);
+        Assert.Null(profile["claim_level_recall"]);
+        Assert.Null(profile["claim_level_f1"]);
+        Assert.Null(profile["claim_scores"]);
+    }
+
+    [Fact]
     public void Build_IsDeterministic_SameInputsProduceSameOutput()
     {
         var eghr = Eghr(2, 1, 1, 0);

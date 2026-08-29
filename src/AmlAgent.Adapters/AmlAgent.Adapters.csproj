@@ -15,4 +15,8 @@
     <PackageReference Include="Neo4j.Driver" Version="5.24.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AmlAgent.Evidence\AmlAgent.Evidence.csproj" />
+  </ItemGroup>
+
 </Project>

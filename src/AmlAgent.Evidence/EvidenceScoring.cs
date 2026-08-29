@@ -21,6 +21,9 @@ public static class EvidenceScoring
 {
     private static readonly Regex TxnIdPattern = new(@"\bT[123]-\d{3}\b", RegexOptions.Compiled);
 
+    /// <summary>Whole-token candidate ids in free text: starts with a letter/digit, continues with letters/digits/hyphen/underscore. Used by ExtractCitedEvidenceIds to tokenise a report once rather than re-scanning per known id.</summary>
+    private static readonly Regex TokenPattern = new(@"[A-Za-z0-9][A-Za-z0-9_\-]*", RegexOptions.Compiled);
+
     /// <summary>Parses the set of real transaction IDs out of a CSV's text content.</summary>
     public static HashSet<string> ParseTxnIdsFromCsv(string csvContent, string idColumn = "txn_id")
     {
@@ -109,16 +112,82 @@ public static class EvidenceScoring
     public static TraceabilityResult ComputeTraceability(
         string reportText,
         IReadOnlySet<string> validTxnIds,
-        IReadOnlySet<string>? goldTxnIds)
+        IReadOnlySet<string>? goldTxnIds) =>
+        ComputeTraceabilityFromCitations(ExtractCitedTxnIds(reportText), validTxnIds, goldTxnIds);
+
+    /// <summary>
+    /// Every known evidence id (any type -- transaction, relationship, SAR,
+    /// watchlist entry, whatever the case actually contains) that appears in
+    /// free text as a whole token, including duplicates. Tokenises the text
+    /// once (O(text length)) and looks each token up in a hashset of known
+    /// ids (O(1) per token), rather than running one regex per evidence item
+    /// -- correctness and performance both come from matching against the
+    /// case's ACTUAL id vocabulary instead of a fixed shape pattern, which is
+    /// what lets a relationship id like "R1" or a SAR id like "SAR-2026-001"
+    /// be recognised for the first time. The returned strings are the
+    /// reference's own casing (EvidenceId), not necessarily the text's.
+    /// </summary>
+    public static List<string> ExtractCitedEvidenceIds(string text, IReadOnlyCollection<EvidenceReference> knownEvidence)
     {
-        var cited = ExtractCitedTxnIds(reportText);
+        var cited = new List<string>();
+        if (string.IsNullOrEmpty(text) || knownEvidence.Count == 0) return cited;
+
+        var knownIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var reference in knownEvidence)
+            knownIds[reference.EvidenceId] = reference.EvidenceId;
+
+        foreach (Match m in TokenPattern.Matches(text))
+        {
+            if (knownIds.TryGetValue(m.Value, out var canonicalId))
+                cited.Add(canonicalId);
+        }
+        return cited;
+    }
+
+    /// <summary>
+    /// Generalised evidence traceability: citation precision/recall against a
+    /// gold evidence set drawn from ANY evidence type (see EvidenceReference),
+    /// not just transactions. Extraction unions two mechanisms so neither
+    /// capability regresses relative to the transaction-only overload below:
+    /// (1) known-evidence-id token matching, which recognises a real citation
+    /// to any evidence type actually present in validEvidence regardless of
+    /// its id shape; (2) the legacy transaction-id-shaped regex, restricted to
+    /// ids NOT already found by (1), so a fabricated transaction-shaped id
+    /// (e.g. "T3-999", matching the shape but absent from validEvidence) is
+    /// still caught as fabricated, exactly as the transaction-only overload
+    /// already does. Fabrication detection for non-transaction-shaped
+    /// evidence types is a real, still-open gap: there is no single universal
+    /// id shape to pattern-match arbitrary evidence types against, so an
+    /// agent fabricating e.g. a relationship id that was never mentioned
+    /// anywhere is not yet caught here -- only citations to REAL non-
+    /// transaction evidence are recognised. See
+    /// docs/evidence-traceability-framework.md for this scope note.
+    /// </summary>
+    public static TraceabilityResult ComputeTraceability(
+        string reportText,
+        IReadOnlyCollection<EvidenceReference> validEvidence,
+        IReadOnlyCollection<EvidenceReference>? goldEvidence)
+    {
+        var validIds = new HashSet<string>(validEvidence.Select(e => e.EvidenceId), StringComparer.OrdinalIgnoreCase);
+        var goldIds = goldEvidence is null ? null : new HashSet<string>(goldEvidence.Select(e => e.EvidenceId), StringComparer.OrdinalIgnoreCase);
+
+        var cited = new List<string>();
+        cited.AddRange(ExtractCitedEvidenceIds(reportText, validEvidence));
+        cited.AddRange(ExtractCitedTxnIds(reportText).Where(id => !validIds.Contains(id)));
+
+        return ComputeTraceabilityFromCitations(cited, validIds, goldIds);
+    }
+
+    /// <summary>Shared arithmetic between the transaction-only and generalised ComputeTraceability overloads, so the two stay behaviourally identical wherever their inputs are equivalent.</summary>
+    private static TraceabilityResult ComputeTraceabilityFromCitations(List<string> cited, IReadOnlySet<string> validIds, IReadOnlySet<string>? goldIds)
+    {
         var citedDistinct = new HashSet<string>(cited, StringComparer.OrdinalIgnoreCase);
         var fabricated = citedDistinct
-            .Where(id => !validTxnIds.Contains(id))
+            .Where(id => !validIds.Contains(id))
             .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var grounded = new HashSet<string>(
-            citedDistinct.Where(id => validTxnIds.Contains(id)),
+            citedDistinct.Where(id => validIds.Contains(id)),
             StringComparer.OrdinalIgnoreCase);
         var groundedList = grounded.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
 
@@ -126,19 +195,19 @@ public static class EvidenceScoring
         double? precision = null, recall = null, f1 = null;
         var matchedList = new List<string>();
         var missingList = new List<string>();
-        var goldList = goldTxnIds is null
+        var goldList = goldIds is null
             ? new List<string>()
-            : goldTxnIds.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
+            : goldIds.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
 
-        if (goldTxnIds is not null)
+        if (goldIds is not null)
         {
-            matchedList = grounded.Where(id => goldTxnIds.Contains(id))
+            matchedList = grounded.Where(id => goldIds.Contains(id))
                 .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
-            missingList = goldTxnIds.Where(id => !grounded.Contains(id))
+            missingList = goldIds.Where(id => !grounded.Contains(id))
                 .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
             matched = matchedList.Count;
             precision = grounded.Count == 0 ? null : Math.Round((double)matched / grounded.Count, 4);
-            recall = goldTxnIds.Count == 0 ? null : Math.Round((double)matched / goldTxnIds.Count, 4);
+            recall = goldIds.Count == 0 ? null : Math.Round((double)matched / goldIds.Count, 4);
             if (precision is double p && recall is double r && (p + r) > 0)
                 f1 = Math.Round(2 * p * r / (p + r), 4);
         }
@@ -149,7 +218,7 @@ public static class EvidenceScoring
             FabricatedCitations: fabricated,
             GroundedDistinct: grounded.Count,
             GroundedCitations: groundedList,
-            GoldTotal: goldTxnIds?.Count,
+            GoldTotal: goldIds?.Count,
             GoldEvidenceTxnIds: goldList,
             MatchedGoldCitations: matched,
             MatchedGoldCitationsList: matchedList,
