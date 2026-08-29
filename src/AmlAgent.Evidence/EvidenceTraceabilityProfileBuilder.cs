@@ -14,7 +14,11 @@ namespace AmlAgent.Evidence;
 /// instead of the legacy EGHR supported/unsupported/contradicted buckets.
 ///
 /// Fields the current implementation cannot yet compute (claim_support_coverage,
-/// evidence_sufficiency_rate) are explicitly null, never fabricated as zero.
+/// evidence_sufficiency_rate, reconstruction_success) are explicitly null, never
+/// fabricated as zero. run_reproducibility_note is a fixed descriptive string,
+/// not a computed rate -- see docs/evidence-traceability-framework.md#run-reproducibility
+/// for why "reproducibility" here is an experimental property (repeated-run
+/// variance), not something a single profile can report a number for.
 /// </summary>
 public static class EvidenceTraceabilityProfileBuilder
 {
@@ -74,6 +78,8 @@ public static class EvidenceTraceabilityProfileBuilder
             ["evidence_traceability_f1"] = evidenceTraceability?["f1"]?.DeepClone(),
             ["claim_support_coverage"] = null, // not yet implemented -- requires claim-level material-claim identification
             ["evidence_sufficiency_rate"] = null, // not yet implemented -- requires validated sufficiency annotation
+            ["reconstruction_success"] = null, // not yet implemented -- no per-claim reconstruction check exists for agent output yet
+            ["run_reproducibility_note"] = "Deterministic scoring (this profile, EGHR, traceability, policy evaluation) is exactly repeatable given identical inputs -- see AmlAgent.ResearchValidation.DeterminismTests. The underlying LLM's own output is not deterministic; use `aml-harness experiment repeat`/`experiment judge-repeat` to measure that separately, not this field.",
             ["invalid_reference_count"] = fabricatedCount,
             ["unsupported_claim_count"] = (int?)eghr?["unsupported_count"],
             ["traceability_failures"] = failures,

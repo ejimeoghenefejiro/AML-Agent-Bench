@@ -18,17 +18,30 @@ Annotation happens at five levels, not just "is this citation correct":
 - **evidence necessity** — whether a given evidence item is *required* for the claim to be considered supported, or merely *helpful*.
 - **evidence sufficiency** — whether the full set of evidence linked to a claim is *adequate* to support the claim's strength and scope, not just individually relevant.
 
-## Annotation questions
+## Annotation decisions
 
-For each candidate claim, an annotator answers:
+Formally, an annotator makes six named decisions per candidate claim:
 
-1. Is this a material claim requiring evidence? (Not every sentence in a report is a checkable factual assertion.)
-2. Which records directly support it?
-3. Which records are necessary but not individually sufficient? (E.g. one leg of a three-hop transfer chain.)
-4. Are multiple evidence sets valid? (Two different, non-overlapping sets of records could each independently establish the same claim.)
-5. What constitutes minimum sufficient evidence for this claim?
-6. Is the claim too broad for the available evidence? (A claim can be true but not fully supportable by what the case actually contains.)
-7. Are there ambiguous but reasonable alternative mappings? (Two annotators could legitimately disagree on which record a vague claim refers to.)
+| Decision | Annotation question |
+|---|---|
+| Materiality | Would removing this claim materially change the interpretation of the case? |
+| Relevance | Does the evidence concern the entities, period, and event described by the claim? |
+| Support | Does the evidence logically support the claim? |
+| Sufficiency | Is the provided evidence set adequate for the scope and strength of the claim? |
+| Necessity | Is this evidence required, or is it one of several acceptable alternatives? |
+| Ambiguity | Are multiple evidence sets equally defensible? If yes, all acceptable sets should be represented, not collapsed into one. |
+
+## Annotation questions (worked form)
+
+The same six decisions, restated as the concrete questions an annotator walks through for each candidate claim:
+
+1. Is this a material claim requiring evidence? (Not every sentence in a report is a checkable factual assertion.) — **Materiality**
+2. Which records directly support it? — **Support**
+3. Which records are necessary but not individually sufficient? (E.g. one leg of a three-hop transfer chain.) — **Necessity**
+4. Are multiple evidence sets valid? (Two different, non-overlapping sets of records could each independently establish the same claim.) — **Ambiguity**
+5. What constitutes minimum sufficient evidence for this claim? — **Sufficiency**
+6. Is the claim too broad for the available evidence? (A claim can be true but not fully supportable by what the case actually contains.) — **Sufficiency**
+7. Are there ambiguous but reasonable alternative mappings? (Two annotators could legitimately disagree on which record a vague claim refers to.) — **Relevance / Ambiguity**
 
 ## Annotation provenance
 

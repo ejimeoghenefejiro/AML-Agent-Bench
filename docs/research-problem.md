@@ -25,23 +25,48 @@ AML compliance is high-stakes and error-sensitive: a false positive delays legit
 
 ## Research problem
 
-> **How can evidence traceability in autonomous AML-agent investigations be rigorously defined, operationalised, measured, and validated?**
+> **There is no established, validated and domain-specific method for determining how well the material claims produced by autonomous AML agents can be traced to identifiable, relevant and sufficient evidence in the underlying investigation record.**
+
+## Why the research had to be narrowed
+
+The original framing combined hallucination, evidence traceability, bias/fairness, explainability, auditability, and regulatory trust as joint dimensions. Each has distinct theory, measurement challenges, datasets, and validation requirements; operationalising all of them at doctoral depth risked a thesis that was broad but methodologically shallow.
+
+| Original dimension | Why it expands scope | Revised treatment |
+|---|---|---|
+| Hallucination | Requires claim taxonomies, semantic support/contradiction judgments, and validation of what counts as intrinsic vs. extrinsic hallucination. | Removed as a primary construct. Unsupported, contradicted, or fabricated evidence is treated as a [traceability failure class](evidence-traceability-framework.md#traceability-failure-taxonomy), not a separate hallucination theory. |
+| Bias/fairness | Requires protected-group design, counterfactual cases, fairness definitions, statistical power, and potentially sensitive data. | Removed from core doctoral scope. |
+| Explainability | Requires a theory of explanation quality and faithfulness, often including perturbation or causal tests. | No separate XAI contribution claimed. Retained only where needed to interpret evidence links. |
+| Auditability | Can become a major systems-governance programme in its own right. | Treated as a supporting property of reproducibility and evidence reconstruction, not a measured dependent variable. |
+| Regulatory trust | Trust is a human and institutional construct, difficult to reduce to an automatic benchmark score. | Reframed as downstream governance relevance (see [assurance/README.md](../assurance/README.md#positioning-relative-to-the-phd)), not a measured dependent variable. |
+| Evidence traceability | Directly aligned with transaction records, claim support, reproducibility, and evidentiary AML workflows. | Made the sole core doctoral construct. |
 
 ## Research gap
 
-Existing citation, attribution, grounding, and general-purpose agent-evaluation methods have not been systematically operationalised and empirically validated as an evidence-traceability benchmark for autonomous AML investigations over structured financial records and multi-step investigative tasks. This is not a claim that no citation or grounding evaluation exists — it is a narrower claim about four specific layers where that work has not yet been done for this domain:
+Existing citation, attribution, grounding, and general-purpose agent-evaluation methods have not been systematically operationalised and empirically validated as an evidence-traceability benchmark for autonomous AML investigations over structured financial records and multi-step investigative tasks. This is not a claim that no citation or grounding evaluation exists — it is a narrower claim about five specific layers where that work has not yet been done for this domain:
 
-**Domain gap.** Existing citation and attribution evaluation is often applied to document retrieval, question answering, search, or text generation. AML-Agent-Bench evaluates evidence such as transaction IDs, account relationships, temporal movement, transaction-network patterns, typology indicators, risk-relevant records, and evidence packages supporting investigative claims — evidence types with no direct analogue in general-purpose grounding benchmarks.
+| Gap layer | Specific gap | AML-Agent-Bench response |
+|---|---|---|
+| Domain gap | Existing citation/attribution evaluation is oriented to document retrieval, question answering, or web/source citation. | Evaluate claims grounded in transaction IDs, account relations, temporal patterns, network structures, typologies, and case evidence — evidence types with no direct analogue in general-purpose grounding benchmarks. |
+| Agentic gap | Final-answer citation quality does not fully capture tool use, retrieval trajectories, and multi-step investigation. | Evaluate evidence links generated within autonomous, tool-using AML workflows — the relationship between agent claims, cited evidence, underlying records, and (where appropriate) the recorded execution trajectory, not just the final text. |
+| Measurement gap | A single citation count or holistic LLM rubric is insufficient; a score is not useful unless its construct validity, reliability, and sensitivity are established. | Develop and validate a multi-component evidence-traceability measurement model (see [docs/evidence-traceability-framework.md](evidence-traceability-framework.md)) distinguishing reference validity, precision, recall, coverage, sufficiency, and reconstruction. |
+| Benchmark gap | AML evaluation typically emphasises detection/prediction rather than evidentiary reconstruction. | Create controlled AML scenarios with gold claim-evidence mappings (see [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md)). |
+| Intervention gap | It is not enough to diagnose weak traceability. | Test evidence-oriented agent designs that attempt to improve traceability without sacrificing task performance (RQ4; see [docs/experimental-design.md](experimental-design.md)). |
 
-**Agentic gap.** The subject being evaluated is not merely a text generator. An autonomous AML agent may inspect files or data, call tools, perform calculations, build graph or temporal representations, retrieve evidence, derive a conclusion, and generate an investigative output. Evidence traceability should therefore evaluate the relationship between agent claims, cited evidence, underlying records, and (where appropriate) the recorded execution trajectory — not just the final text.
-
-**Measurement gap.** A single citation count or holistic LLM rubric is insufficient. The benchmark distinguishes citation/reference validity, evidence relevance, evidence precision, evidence recall, claim-support coverage, evidence sufficiency, traceability failure type, and reproducibility of the evidence mapping.
-
-**Validation gap.** The main doctoral contribution is not inventing another F1 variant — it is the construction and validation of a domain-specific measurement framework, ultimately demonstrating content validity, construct validity, convergent validity, discriminant validity, reliability, reproducibility, and sensitivity to controlled traceability degradation. See [docs/validation-plan.md](validation-plan.md).
+The doctoral novelty is the validated framework and benchmark, not the invention of precision, recall, or F1 — see [docs/validation-plan.md](validation-plan.md) for how content validity, construct validity, convergent validity, discriminant validity, reliability, reproducibility, and sensitivity to controlled traceability degradation are each demonstrated (or honestly marked as not yet demonstrated).
 
 ## Proposed contribution
 
 AML-Agent-Bench evaluates an AML agent's evidence traceability as the sole primary doctoral construct. Task performance, reproducibility, auditability, human review, and governance are supporting properties measured through the same harness, not separate deep studies competing for primacy. See [docs/evidence-traceability-framework.md](evidence-traceability-framework.md) for the formal claim–evidence model and [docs/research-scope-mapping.md](research-scope-mapping.md) for what the current codebase implements today versus what remains.
+
+## Objectives
+
+1. Conceptualise evidence traceability in autonomous AML investigation and define its constituent properties.
+2. Develop an AML-specific claim-evidence annotation framework and benchmark task taxonomy.
+3. Operationalise evidence traceability using deterministic and, where necessary, validated semantic measures.
+4. Establish the reliability and validity of the benchmark and its gold evidence annotations.
+5. Experimentally compare evidence-traceability performance across models, agent architectures, task complexity levels, and evidence conditions.
+6. Evaluate interventions designed to improve evidence traceability without materially degrading AML task performance.
+7. Release a reproducible research artefact and document how its outputs can support human review and model governance.
 
 ## Research questions
 
@@ -55,15 +80,16 @@ AML-Agent-Bench evaluates an AML agent's evidence traceability as the sole prima
 
 ## Task complexity taxonomy
 
-The task suite is organised by evidence-traceability complexity rather than by which trust dimension a task was meant to exercise. The current prototype implements the first two levels:
+The task suite is organised by evidence-traceability complexity rather than by which trust dimension a task was meant to exercise:
 
-| Level | Task family | What it measures | Status |
+| Level | Task family | Traceability challenge | Status |
 |---|---|---|---|
-| 1 — Direct evidence retrieval | Agent identifies a suspicious fact/pattern and cites a directly supporting record | Basic reference validity and precision | **Implemented** — `tasks/aml-transaction-network` |
-| 2 — Multi-record aggregation / temporal reasoning | Agent combines several records, or evidence across time windows, to support one conclusion | Completeness and sufficiency | **Implemented** — `tasks/task-006-temporal-network-anomaly-detection` |
-| 3 — Network reasoning | Agent establishes a relational pattern (circular flow, layering, connected suspicious clusters) across multiple heterogeneous sources | Relational evidence chains, cross-source traceability | **Implemented** — `tasks/task-007-multi-source-mule-network` |
-| 4 — Case synthesis | Agent produces a multi-claim investigative case summary or SAR-style reasoning output with claim-specific evidence packages | Claim-level evidence mapping at case scale | Planned |
-| 5 — Ambiguous/adversarial evidence | Controlled difficulty: irrelevant distractor transactions, near-duplicate IDs, incomplete records, competing plausible explanations, conflicting evidence, missing evidence, noisy data | How traceability degrades with complexity | Planned — see `validation/experiments/README.md` items 10–12 for the noise/distractor and false-positive-protection groundwork already in place |
+| 1 — Direct evidence retrieval | Single claim to single evidence item — agent identifies a suspicious fact/pattern and cites a directly supporting record | Basic reference validity and precision | **Implemented** — `tasks/aml-transaction-network` |
+| 2 — Multi-record aggregation | Single claim requires several evidence items (e.g. demonstrating structuring across multiple transfers) | Completeness and sufficiency within one time window | Planned as a standalone task — `tasks/task-006-temporal-network-anomaly-detection` already exercises this challenge *within* each week as part of its temporal-reasoning task (level 4 below), but no task isolates multi-record aggregation on its own yet |
+| 3 — Network reasoning | Claims depend on relational graph structure across multiple heterogeneous sources (circular flow, layering, connected suspicious clusters) | Relational evidence chains, cross-source traceability | **Implemented** — `tasks/task-007-multi-source-mule-network` |
+| 4 — Temporal reasoning | Claims depend on changes across time windows (week-over-week change, rapid movement) | Completeness and sufficiency across time | **Implemented** — `tasks/task-006-temporal-network-anomaly-detection` |
+| 5 — Case synthesis | Multiple claims require separate evidence packages — agent produces a multi-claim investigative case summary or SAR-style reasoning output | Claim-level evidence mapping at case scale | Planned |
+| 6 — Ambiguous/adversarial evidence | Noisy, distracting, or incomplete records challenge evidence selection: near-duplicate IDs, irrelevant high-value transfers, partial records, conflicting clues | How traceability degrades with complexity | Planned — see `validation/experiments/README.md` items 10–12 for the noise/distractor and false-positive-protection groundwork already in place |
 
 ## Datasets
 
@@ -71,9 +97,26 @@ The current tasks use small, hand-authored synthetic CSV/JSON/Parquet datasets (
 
 ## Expected contribution to PhD
 
-1. **Conceptual** — a domain-specific formalisation and taxonomy of evidence traceability and traceability failure in autonomous AML investigations.
-2. **Methodological** — a validated claim–evidence measurement framework for assessing traceability against annotated reference evidence.
-3. **Empirical** — evidence on how traceability varies across models, architectures, AML task complexity, and evidence-oriented interventions.
-4. **Technical** — AML-Agent-Bench: an open and reproducible benchmark implementation for executing and evaluating autonomous AML agents under controlled evidentiary conditions.
+1. **C1 — Conceptual** — a formal definition and taxonomy of evidence traceability and traceability failure modes for autonomous AML investigations.
+2. **C2 — Methodological** — a validated claim-level measurement framework covering evidence validity, precision, recall, coverage, sufficiency, and reconstruction.
+3. **C3 — Benchmark/data** — a reproducible family of AML investigative tasks with expert-annotated claim-evidence reference structures.
+4. **C4 — Empirical** — evidence on how model choice, architecture, task complexity, and evidence conditions affect traceability.
+5. **C5 — Intervention** — experimental evidence on which agent-design interventions improve traceability while preserving task performance.
+6. **C6 — Technical** — AML-Agent-Bench as an open, reusable research implementation with deterministic scoring, versioned artefacts, and reproducibility controls.
+7. **C7 — Applied** — a disciplined mapping of traceability outputs to human-review and model-governance use cases, without claiming autonomous regulatory certification.
+
+The thesis does not present Evidence Traceability F1 itself as the principal novelty — precision, recall, and F1 are established measures. Novelty arises from the domain-specific construct, operational framework, reference annotations, validation methodology, benchmark design, and empirical findings.
+
+## Risks, limitations and mitigations
+
+| Risk | Why it matters | Mitigation |
+|---|---|---|
+| Gold evidence subjectivity | Some AML conclusions admit multiple defensible evidence sets. | Represent alternative acceptable sets (see [planned claim-level schema](research-scope-mapping.md#planned-claim-level-schema)); use expert annotation and adjudication; report ambiguity explicitly rather than silently picking one set. |
+| Toy-data validity | Small synthetic tasks may not represent realistic investigations. | Use synthetic data for controlled ground truth first, then expand to larger public/synthetic datasets and increasingly realistic cases (see [Datasets](#datasets) below). |
+| Model drift/versioning | Commercial model behaviour changes over time. | Record exact model/version/date in every run's provenance (already implemented — see `assurance/README.md`); preserve benchmark artefacts; scope conclusions to the observed configuration. |
+| LLM judge bias | Semantic scoring can introduce opaque evaluator error. | Prefer deterministic scoring wherever possible (see [LLM-as-judge positioning](evidence-traceability-framework.md#llm-as-judge-positioning)); human-validate unavoidable semantic judgments once real annotations exist. |
+| Benchmark gaming | Agents may optimise for citation patterns without genuine evidence use. | Include hidden or held-out tasks, perturbations, sufficiency checks, and evidence-order variations — the evidence-corruption sensitivity tests (`tests/AmlAgent.ResearchValidation/EvidenceCorruptionSensitivityTests.cs`) are early groundwork here, though they test the scoring layer's sensitivity, not yet agent gaming behaviour directly. |
+| Overclaiming regulation | A benchmark cannot determine legal compliance. | State governance relevance narrowly (see [assurance/README.md](../assurance/README.md#positioning-relative-to-the-phd)) and keep human/institutional judgment explicit. |
+| Scope creep | Re-adding fairness, XAI, or trust as measured constructs would recreate the original scope problem. | Maintain evidence traceability as the thesis boundary (see [Why the research had to be narrowed](#why-the-research-had-to-be-narrowed) above); treat other concerns as future research. |
 
 See `Proposal/Oghenefejiro Ejime - PhD Research Proposal.pdf` for the full literature review, phased methodology, risk register and provisional timeline.

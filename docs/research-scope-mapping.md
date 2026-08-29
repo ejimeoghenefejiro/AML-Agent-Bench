@@ -56,11 +56,15 @@ A working C#/Semantic Kernel agent, a polyglot Docker harness, a multi-format da
 
 ## Immediate next build priorities
 
-1. Surface Reference Validity Rate as an explicit field, not just the raw fabricated-citation list.
+1. ~~Surface Reference Validity Rate as an explicit field~~ — **done**: `reference_validity_rate` in `evidence_traceability_profile` (`AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder`).
 2. Add claim-level evidence precision/recall/coverage (currently report-level/micro only).
 3. Execute a real, independent-annotator gold-evidence round for at least one task, to start convergent-validity work.
 4. Run `aml-harness experiment repeat` / `experiment judge-repeat` at a statistically meaningful batch size (the current live evidence is a 2-run proof of concept, not a reliability study).
 5. Build the noise/distractor task variants described in `docs/experimental-design.md` and `validation/experiments/README.md`.
+
+## Proposed version milestone
+
+**AML-Agent-Bench v0.2 — Evidence Traceability Core.** A research-facing release that removes hallucination and bias from the benchmark identity, introduces a typed claim-evidence model, expands deterministic traceability metrics, formalises gold annotations, and adds controlled traceability perturbation tests. Several pieces of this milestone are already done (the additive `evidence_traceability_profile` schema, the retitled research docs, EGHR relabelled legacy); the claim-level model, formal annotation round, and perturbation-test suite remain — see the priority list above and `docs/experimental-design.md`'s three-year programme for sequencing.
 
 ## Planned claim-level schema
 

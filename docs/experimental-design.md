@@ -27,6 +27,10 @@ These are provisional, stated for design purposes, and must not be read as alrea
 
 **H4.** Task success is positively but imperfectly associated with evidence traceability; therefore conventional task performance does not substitute for traceability evaluation. (The single preliminary Task 006 run — high rubric pass, low traceability recall — is directional feasibility evidence for H4, not a test of it.)
 
+**H5.** Verifier-assisted architectures reduce invalid references and evidence mismatches relative to single-pass generation.
+
+**H6.** Evidence-oriented interventions improve traceability metrics without a practically significant reduction in AML task performance, subject to task complexity and model capability.
+
 ## Candidate factors
 
 **Models.** Multiple closed and/or open models, selected based on availability during the empirical study — not fixed in advance.
@@ -36,6 +40,17 @@ These are provisional, stated for design purposes, and must not be read as alrea
 **Conditions.** Unconstrained narrative; citation-required; structured claim–evidence output; retrieval-constrained; evidence-before-conclusion prompting; verifier-assisted.
 
 **Repetitions.** Repeated runs to estimate variance in non-deterministic agent behaviour, recording model temperature, seed (where supported), runtime, and API/provider metadata. `aml-harness experiment repeat --runs N` (see `validation/experiments/README.md`) is the runner for this; it captures raw per-run measurements only and does not compute or claim a consistency statistic until one is formally defined.
+
+Illustrative experiment matrix: Models × Architectures × Tasks × Conditions × Repeats. The final design may be blocked or fractional to control cost while preserving the contrasts required for RQ3 and RQ4.
+
+## Experimental controls
+
+- Freeze task inputs, gold annotations, and scorer versions per benchmark release.
+- Record model name/version, system prompt, agent code commit, tool configuration, dataset hash, and rubric/annotation hash — already substantially implemented in `assurance_profile.json`'s `provenance` block (see `assurance/README.md`).
+- Separate deterministic benchmark calculations from stochastic model behaviour (see [LLM-as-judge positioning](evidence-traceability-framework.md#llm-as-judge-positioning)).
+- Use the same task assets when comparing models or architectures.
+- Predefine exclusion rules for malformed runs and API/tool failures — not yet formalised; `ExperimentRepeatCommand` currently records a run's `error`/`parse_error` field when a nested run's workspace or output can't be parsed, but no exclusion RULE (when does a malformed run get dropped from analysis vs. flagged) has been defined yet.
+- Track token use, latency, and cost as secondary efficiency outcomes, never as substitutes for traceability quality. `ExperimentRepeatCommand` already records `latency_seconds` per run; token/cost tracking is not yet captured.
 
 ## Statistical analysis plan (placeholder)
 
@@ -47,8 +62,10 @@ The empirical contribution is not reduced to model ranking. Depending on the dis
 - repeated-run variance;
 - bootstrap intervals where appropriate;
 - regression or mixed-effects modelling;
-- interactions between model, architecture, task complexity, and intervention;
-- multiple-comparison control for broad pairwise testing.
+- interactions between model, architecture, task complexity, and intervention (e.g. Architecture × Task Complexity, Intervention × Model);
+- multiple-comparison control for broad pairwise testing;
+- for H4, explicit quantification of the relationship between task performance and traceability, with discordant cases (high task performance, low traceability, and vice versa) reported directly, not averaged away;
+- robustness analysis using alternative gold-evidence formulations, once the [multiple-valid-gold schema](evidence-annotation-protocol.md#multiple-valid-gold-handling) exists to formulate them.
 
 A conceptual mixed-model sketch (illustrative, not a commitment to a specific estimator):
 
@@ -62,6 +79,24 @@ The final model family will be chosen once the actual metric distributions are k
 
 Starting from `tasks/task-007-multi-source-mule-network`, the plan is controlled variants holding the ground-truth suspicious network constant while varying: no distractors / small / many innocent distractors; irrelevant transactions; irrelevant KYC records; irrelevant graph relationships; incomplete evidence; contradictory evidence — and separately, measuring whether agents over-flag known-innocent entities or under-flag known-suspicious ones. The deterministic half (can the scoring layer itself detect over/under-reporting) is already validated (`tests/AmlAgent.ResearchValidation/DiscriminationValidationTests.cs`). The live half (does an agent actually over/under-report) needs the task variants built and `aml-harness experiment repeat` run against them at a meaningful batch size — see `validation/experiments/README.md` items 10 and 12 for exact status.
 
+## Three-year research programme
+
+Provisional, subject to supervisory review and pilot-data feedback — not a locked commitment.
+
+| Period | Primary work | Key outputs |
+|---|---|---|
+| Year 1: Construct and instrument | Systematic review; construct definition; task taxonomy; annotation codebook; gold evidence pilot; benchmark refactor; pilot validity tests. | Conceptual paper/protocol; AML-Agent-Bench v0.2 (see [docs/research-scope-mapping.md](research-scope-mapping.md#proposed-version-milestone)); validated annotation procedure; pilot dataset. |
+| Year 2: Experimental validation | Scale task families and datasets; multi-annotator validation; cross-model and cross-architecture experiments; construct/discriminant validity; first intervention studies. | Empirical paper 1; benchmark release v0.5; validated traceability profile; comparative results. |
+| Year 3: Robustness and synthesis | Adversarial/noisy evidence; intervention comparison; robustness/generalisation analysis; governance mapping; thesis synthesis. | Empirical paper 2; AML-Agent-Bench v1.0; governance mapping; final thesis. |
+
+### Publication strategy
+
+- Paper 1: Conceptualisation and validation of evidence traceability for autonomous AML agents.
+- Paper 2: Cross-model and cross-architecture evidence-traceability benchmark study.
+- Paper 3 or thesis chapter: Improving traceability through evidence-oriented agent architectures and verification mechanisms.
+
+The publication sequence mirrors the thesis logic: define and validate the measurement instrument first, then use it to produce comparative findings.
+
 ## What this document is not
 
-Not a locked protocol, not a pre-registration, not a statement that any of H1–H4 have been tested. It is the design this PhD's empirical chapters will refine once feasibility (cost, API access, task-variant authoring) is assessed.
+Not a locked protocol, not a pre-registration, not a statement that any of H1–H6 have been tested. It is the design this PhD's empirical chapters will refine once feasibility (cost, API access, task-variant authoring) is assessed. The final hypothesis set itself should be refined after the systematic literature review and pilot studies — H1–H6 above are defensible starting hypotheses, not a closed list.

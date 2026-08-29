@@ -138,6 +138,18 @@ public class EvidenceTraceabilityProfileBuilderTests
         Assert.Null(profile["claim_support_coverage"]);
         Assert.True(profile.ContainsKey("evidence_sufficiency_rate"));
         Assert.Null(profile["evidence_sufficiency_rate"]);
+        Assert.True(profile.ContainsKey("reconstruction_success"));
+        Assert.Null(profile["reconstruction_success"]);
+    }
+
+    [Fact]
+    public void Build_RunReproducibilityNote_IsAFixedDescriptiveStringNotAComputedRate()
+    {
+        var profile = EvidenceTraceabilityProfileBuilder.Build(Eghr(1, 1, 0, 0), Trace(1, new JsonArray(), new JsonArray(), 1.0, 1.0, 1.0));
+
+        var note = (string?)profile["run_reproducibility_note"];
+        Assert.False(string.IsNullOrWhiteSpace(note));
+        Assert.Contains("experiment repeat", note);
     }
 
     [Fact]

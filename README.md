@@ -393,7 +393,7 @@ See [submissions/README.md](submissions/README.md) for the full submission contr
 - Level-3 task in the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy): the agent must establish a relational fraud pattern (mule network) spanning multiple sources, not just cite individual transactions.
 - See `tasks/task-007-multi-source-mule-network/`: [prompt.md](tasks/task-007-multi-source-mule-network/prompt.md), [expected-behaviour.md](tasks/task-007-multi-source-mule-network/expected-behaviour.md), [rubric.json](tasks/task-007-multi-source-mule-network/rubric.json).
 
-More tasks can be added by creating a new `tasks/<id>/` folder with the same files. These three tasks cover the first three levels of the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy) (direct evidence retrieval, multi-record/temporal aggregation, network reasoning); case synthesis and ambiguous/adversarial-evidence levels are planned.
+More tasks can be added by creating a new `tasks/<id>/` folder with the same files. These three tasks cover levels 1, 3 and 4 of the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy) (direct evidence retrieval, network reasoning, temporal reasoning); a standalone multi-record-aggregation task (level 2), case synthesis (level 5), and ambiguous/adversarial evidence (level 6) are planned.
 
 **See [docs/preliminary-results.md](docs/preliminary-results.md) for first real cross-model, cross-language, and repeated-run results.**
 
@@ -835,6 +835,7 @@ If new task folders appear they pick up automatically — the harness discovers 
 - For how the measurements themselves are validated, see [docs/validation-plan.md](docs/validation-plan.md).
 - For the planned controlled experimental programme, see [docs/experimental-design.md](docs/experimental-design.md).
 - For exactly what the research design specifies vs. what's implemented, see [docs/research-scope-mapping.md](docs/research-scope-mapping.md).
+- For rehearsed answers to likely viva examiner questions, see [docs/viva-defence.md](docs/viva-defence.md).
 - For reproducer flow, see [docs/reproduce.md](docs/reproduce.md).
 - For first cross-model and cross-language data, see [docs/preliminary-results.md](docs/preliminary-results.md).
 - For the rehearsed supervisor demo, see [docs/demo-script.md](docs/demo-script.md).
