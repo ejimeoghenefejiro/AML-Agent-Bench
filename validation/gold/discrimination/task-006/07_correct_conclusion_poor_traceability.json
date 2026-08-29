@@ -1,0 +1,17 @@
+{
+  "category": "correct_conclusion_poor_traceability",
+  "quality_rank": 7,
+  "description": "Fix #9, discriminant-validity family 1: the narrative conclusion is correct -- week 2 is the anomaly onset via new intermediaries, week 3 is the exfiltration phase to high-risk jurisdictions, matching this task's real ground truth -- but the report barely documents it: 1 of 13 gold transactions cited, plus one fabricated citation.",
+  "report_text": "The network shows a clear anomaly pattern: week 2 introduces new intermediary accounts absorbing a volume spike, and week 3 exits funds to high-risk jurisdictions. See T2-003 for one example, corroborated further by T3-099.",
+  "claims": [
+    { "text": "Week 2 shows a spike from new intermediary accounts.", "cited_txn_ids": ["T2-003"], "judge_support": "supported" },
+    { "text": "Week 3 exits funds to high-risk jurisdictions.", "cited_txn_ids": [], "judge_support": "unsupported" },
+    { "text": "This is further corroborated by additional records.", "cited_txn_ids": ["T3-099"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 1,
+    "missing_gold_citations_count": 12,
+    "unsupported_or_contradicted_claim_count": 2
+  },
+  "flag": "DISCRIMINANT VALIDITY (fix #9): the conclusion here (week 2 onset, week 3 exfiltration to high-risk jurisdictions) matches this task's real ground truth (evidence-annotations.json's rationale) -- unlike task-007's 09/10 pair, this correctness is asserted by the fixture author, not mechanically verified against a structured findings.csv, since task-006's output shape (a CSV of per-week anomaly scores plus a narrative report) has no entity-classification ground truth to check against the way task-007's account roles do. Traceability, in contrast, IS mechanically poor here: 1 of 13 gold transactions matched, one fabricated citation, 2 of 3 claims unsupported. Pair with 04_incorrect_conclusion_plausible_explanation.json (same conclusion-invisible-to-metrics finding, opposite direction: perfect citations, wrong conclusion) for task-006's version of the demonstration that outcome correctness and evidence traceability are non-equivalent constructs."
+}

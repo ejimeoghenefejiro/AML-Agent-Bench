@@ -55,7 +55,7 @@ public class DiscriminationValidationTests
     }
 
     private static Dictionary<string, Fixture> LoadTask(string taskName) =>
-        Directory.GetFiles(Path.Combine(RootDir, taskName), "0*.json")
+        Directory.GetFiles(Path.Combine(RootDir, taskName), "*.json").Where(f => !Path.GetFileName(f).StartsWith('_'))
             .Select(LoadFixture)
             .ToDictionary(f => f.Category);
 
@@ -256,9 +256,9 @@ public class DiscriminationValidationTests
     }
 
     [Fact]
-    public void AllEightRequiredCategoriesArePresent_Task007()
+    public void AllTenRequiredCategoriesArePresent_Task007()
     {
-        var categories = Directory.GetFiles(Path.Combine(RootDir, "task-007"), "0*.json")
+        var categories = Directory.GetFiles(Path.Combine(RootDir, "task-007"), "*.json").Where(f => !Path.GetFileName(f).StartsWith('_'))
             .Select(f => (string)JsonNode.Parse(File.ReadAllText(f))!["category"]!)
             .ToHashSet();
 
@@ -268,17 +268,19 @@ public class DiscriminationValidationTests
             "correct_conclusion_fabricated_citation", "incorrect_conclusion_plausible_explanation",
             "unsupported_claim_hallucination", "missing_important_gold_evidence",
             "over_reporting_innocent_entities", "under_reporting_suspicious_entities",
+            "correct_outcome_poor_traceability", "incorrect_outcome_excellent_traceability",
         };
         foreach (var r in required) Assert.Contains(r, categories);
+        Assert.Equal(10, categories.Count);
     }
 
     [Fact]
-    public void SixApplicableCategoriesArePresent_Task006()
+    public void SevenApplicableCategoriesArePresent_Task006()
     {
         // over/under-reporting entities do not apply to task-006's output shape
         // (a temporal CSV summary + narrative report, no entity classification) --
         // documented as not-applicable rather than silently absent.
-        var categories = Directory.GetFiles(Path.Combine(RootDir, "task-006"), "0*.json")
+        var categories = Directory.GetFiles(Path.Combine(RootDir, "task-006"), "*.json").Where(f => !Path.GetFileName(f).StartsWith('_'))
             .Select(f => (string)JsonNode.Parse(File.ReadAllText(f))!["category"]!)
             .ToHashSet();
 
@@ -287,8 +289,106 @@ public class DiscriminationValidationTests
             "correct_answer_correct_evidence", "correct_conclusion_incomplete_evidence",
             "correct_conclusion_fabricated_citation", "incorrect_conclusion_plausible_explanation",
             "unsupported_claim_hallucination", "missing_important_gold_evidence",
+            "correct_conclusion_poor_traceability",
         };
         foreach (var r in required) Assert.Contains(r, categories);
-        Assert.Equal(6, categories.Count);
+        Assert.Equal(7, categories.Count);
+    }
+
+    // -- Fix #9: discriminant-validity fixture families, made explicit --
+    //
+    // Family 1 (correct AML conclusion + poor traceability) and Family 2
+    // (incorrect AML conclusion + excellent traceability) are the two
+    // off-diagonal cells of the correctness x traceability matrix H4 asks
+    // about. If the two constructs were equivalent, these cells would be
+    // empty -- a correct conclusion would always come with good traceability
+    // and vice versa. They are not empty: both fixtures below exist and are
+    // internally consistent, which is itself the empirical demonstration.
+
+    [Theory]
+    [MemberData(nameof(Tasks))]
+    public void DiscriminantValidityFamily1_CorrectConclusion_HasPoorTraceability(string task)
+    {
+        var fixtures = LoadTask(task);
+        var category = task == "task-007" ? "correct_outcome_poor_traceability" : "correct_conclusion_poor_traceability";
+        var perfect = fixtures["correct_answer_correct_evidence"];
+        var f = fixtures[category];
+
+        // Traceability is genuinely poor, not merely "slightly below perfect":
+        // recall under 25% and standard precision no better than a coin flip.
+        Assert.True(f.Trace.Recall < 0.25, $"[{task}] recall should be poor (<0.25), was {f.Trace.Recall}");
+        Assert.True(f.Trace.Precision <= 0.5, $"[{task}] standard precision should be poor (<=0.5), was {f.Trace.Precision}");
+        Assert.True(Composite(f) < Composite(perfect), $"[{task}] poor-traceability composite should be strictly below the perfect report's");
+
+        if (task == "task-007")
+        {
+            // The objective, structural half of the demonstration: outcome
+            // correctness (findings.csv) is nonetheless perfect.
+            var (fp, fn) = ClassifyFindings(f.Raw["findings"]!.AsArray());
+            Assert.Empty(fp);
+            Assert.Empty(fn);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Tasks))]
+    public void DiscriminantValidityFamily2_IncorrectConclusion_HasExcellentTraceability(string task)
+    {
+        var fixtures = LoadTask(task);
+        var perfect = fixtures["correct_answer_correct_evidence"];
+        var f = fixtures["incorrect_conclusion_plausible_explanation"];
+
+        // Traceability is indistinguishable from the genuinely correct report --
+        // "excellent" means literally tied with perfect, not just "good".
+        Assert.Equal(perfect.Trace.Precision, f.Trace.Precision);
+        Assert.Equal(perfect.Trace.Recall, f.Trace.Recall);
+        Assert.Equal(perfect.Trace.F1, f.Trace.F1);
+        Assert.Equal(perfect.Eghr.Rate, f.Eghr.Rate);
+    }
+
+    [Fact]
+    public void DiscriminantValidityFamily2_Task007_ObjectivelyWrongOutcomeConfirmedByStructuralCheck()
+    {
+        // task-007's upgraded version of family 2 (10_incorrect_outcome_excellent_traceability):
+        // unlike incorrect_conclusion_plausible_explanation (whose wrongness is
+        // only narratively asserted), this fixture's wrongness is checkable
+        // against real ground truth via ClassifyFindings, the same mechanism
+        // 07/08 (over/under-reporting) already use.
+        var fixtures = LoadTask("task-007");
+        var perfect = fixtures["correct_answer_correct_evidence"];
+        var f = fixtures["incorrect_outcome_excellent_traceability"];
+
+        Assert.Equal(perfect.Trace.Precision, f.Trace.Precision);
+        Assert.Equal(perfect.Trace.Recall, f.Trace.Recall);
+        Assert.Equal(perfect.Trace.F1, f.Trace.F1);
+        Assert.Equal(1.0, f.Trace.F1); // "excellent" spelled out, not just "tied"
+
+        var (fp, fn) = ClassifyFindings(f.Raw["findings"]!.AsArray());
+        Assert.NotEmpty(fp.Concat(fn)); // the outcome IS objectively wrong, unlike traceability's blind verdict
+        Assert.Contains("N150", fp);
+        Assert.Contains("EXT401", fn);
+    }
+
+    [Fact]
+    public void DiscriminantValidity_Task007_TheTwoFamiliesAreMirrorImagesOfEachOther()
+    {
+        // The capstone assertion for fix #9: correctness and traceability move
+        // in OPPOSITE directions across the two fixtures, which is exactly what
+        // "non-equivalent constructs" means empirically -- if they were the same
+        // underlying thing, they could not diverge like this.
+        var fixtures = LoadTask("task-007");
+        var correctPoorTrace = fixtures["correct_outcome_poor_traceability"];
+        var incorrectGoodTrace = fixtures["incorrect_outcome_excellent_traceability"];
+
+        var (correctFp, correctFn) = ClassifyFindings(correctPoorTrace.Raw["findings"]!.AsArray());
+        var (incorrectFp, incorrectFn) = ClassifyFindings(incorrectGoodTrace.Raw["findings"]!.AsArray());
+
+        bool outcomeCorrect1 = correctFp.Count == 0 && correctFn.Count == 0;
+        bool outcomeCorrect2 = incorrectFp.Count == 0 && incorrectFn.Count == 0;
+
+        Assert.True(outcomeCorrect1, "family 1 fixture's outcome should be correct");
+        Assert.False(outcomeCorrect2, "family 2 fixture's outcome should be incorrect");
+        Assert.True(correctPoorTrace.Trace.F1 < incorrectGoodTrace.Trace.F1,
+            "traceability should move in the OPPOSITE direction from outcome correctness across these two fixtures");
     }
 }

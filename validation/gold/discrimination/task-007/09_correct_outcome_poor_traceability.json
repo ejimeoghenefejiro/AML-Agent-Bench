@@ -1,0 +1,31 @@
+{
+  "category": "correct_outcome_poor_traceability",
+  "quality_rank": 9,
+  "description": "Fix #9, discriminant-validity family 1: every account in mule_network_findings.csv is classified exactly correctly (perfect outcome) -- victim, mule chain, exit point, and all three innocent accounts cleared -- but the narrative report barely cites anything: 1 of 5 gold transactions, plus one fabricated citation. A correct answer reached without documenting the evidence for it.",
+  "report_text": "N100 sent funds to the mule network, which layered them through an aggregator before the funds exited offshore. The transfer chain is confirmed by T1-001, and further corroborated by T3-999.",
+  "claims": [
+    { "text": "N100 sent funds to the mule network.", "cited_txn_ids": ["T1-001"], "judge_support": "supported" },
+    { "text": "The funds were then layered through an aggregator and exited offshore.", "cited_txn_ids": [], "judge_support": "unsupported" },
+    { "text": "This is further corroborated by additional records.", "cited_txn_ids": ["T3-999"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 1,
+    "missing_gold_citations_count": 4,
+    "unsupported_or_contradicted_claim_count": 2
+  },
+  "findings": [
+    { "account_id": "N100", "classification": "victim" },
+    { "account_id": "M201", "classification": "mule" },
+    { "account_id": "M202", "classification": "mule" },
+    { "account_id": "M301", "classification": "mule" },
+    { "account_id": "EXT401", "classification": "exit_point" },
+    { "account_id": "N150", "classification": "cleared" },
+    { "account_id": "N160", "classification": "cleared" },
+    { "account_id": "N170", "classification": "cleared" }
+  ],
+  "expected_discrete_findings": {
+    "false_positive_innocent_accounts": [],
+    "false_negative_suspicious_accounts": []
+  },
+  "flag": "DISCRIMINANT VALIDITY (fix #9): outcome correctness (findings.csv, checked by ClassifyFindings/DiscriminationValidationTests) is PERFECT here -- zero false positives, zero false negatives, identical to 01_correct_answer_correct_evidence's findings. But evidence traceability is genuinely poor: only 1 of 5 gold transactions matched, precision dragged down further by a fabricated citation (T3-999), EGHR shows 2 of 3 claims unsupported. Pair this with 10_incorrect_outcome_excellent_traceability.json (the mirror-image failure) for the direct empirical demonstration that outcome correctness and evidence traceability are non-equivalent constructs: this fixture is correct-but-untraceable, that one is traceable-but-incorrect. A single composite score that rewards 'the right answer with weak citations' the same as 'a wrong answer with perfect citations' would erase exactly the distinction these two fixtures exist to preserve."
+}

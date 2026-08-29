@@ -64,7 +64,7 @@ The empirical contribution is not reduced to model ranking. Depending on the dis
 - regression or mixed-effects modelling;
 - interactions between model, architecture, task complexity, and intervention (e.g. Architecture × Task Complexity, Intervention × Model);
 - multiple-comparison control for broad pairwise testing;
-- for H4, explicit quantification of the relationship between task performance and traceability, with discordant cases (high task performance, low traceability, and vice versa) reported directly, not averaged away;
+- for H4, explicit quantification of the relationship between task performance and traceability, with discordant cases (high task performance, low traceability, and vice versa) reported directly, not averaged away -- see `validation/gold/discrimination/task-007/{09_correct_outcome_poor_traceability,10_incorrect_outcome_excellent_traceability}.json` (fix #9) for controlled, hand-authored instances of exactly these two discordant cells, with `DiscriminationValidationTests.DiscriminantValidity_Task007_TheTwoFamiliesAreMirrorImagesOfEachOther` asserting the two constructs move in opposite directions across them;
 - robustness analysis using alternative gold-evidence formulations, once the [multiple-valid-gold schema](evidence-annotation-protocol.md#multiple-valid-gold-handling) exists to formulate them.
 
 A conceptual mixed-model sketch (illustrative, not a commitment to a specific estimator):

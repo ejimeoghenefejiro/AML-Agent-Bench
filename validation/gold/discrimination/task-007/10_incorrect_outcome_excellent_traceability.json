@@ -1,0 +1,31 @@
+{
+  "category": "incorrect_outcome_excellent_traceability",
+  "quality_rank": 10,
+  "description": "Fix #9, discriminant-validity family 2: the narrative report cites the complete, correct evidence chain -- identical to 01_correct_answer_correct_evidence's citations, nothing missing, nothing fabricated -- but mule_network_findings.csv gets the network topology wrong: EXT401 (the real offshore exit point) is wrongly cleared, and N150 (an innocent, unrelated customer) is wrongly classified as the exit point instead. Perfect citation hygiene, wrong conclusion.",
+  "report_text": "N100 sent funds to M201 (T1-001) and M202 (T1-002). Both forwarded to M301 (T1-003, T1-004), which sent funds offshore (T2-001).",
+  "claims": [
+    { "text": "N100 sent funds to both first-layer mules.", "cited_txn_ids": ["T1-001", "T1-002"], "judge_support": "supported" },
+    { "text": "Both first-layer mules forwarded funds to the aggregator.", "cited_txn_ids": ["T1-003", "T1-004"], "judge_support": "supported" },
+    { "text": "The aggregator sent funds offshore.", "cited_txn_ids": ["T2-001"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 5,
+    "missing_gold_citations_count": 0,
+    "unsupported_or_contradicted_claim_count": 0
+  },
+  "findings": [
+    { "account_id": "N100", "classification": "victim" },
+    { "account_id": "M201", "classification": "mule" },
+    { "account_id": "M202", "classification": "mule" },
+    { "account_id": "M301", "classification": "mule" },
+    { "account_id": "EXT401", "classification": "cleared" },
+    { "account_id": "N150", "classification": "exit_point" },
+    { "account_id": "N160", "classification": "cleared" },
+    { "account_id": "N170", "classification": "cleared" }
+  ],
+  "expected_discrete_findings": {
+    "false_positive_innocent_accounts": ["N150"],
+    "false_negative_suspicious_accounts": ["EXT401"]
+  },
+  "flag": "DISCRIMINANT VALIDITY (fix #9): EGHR (0.0, identical to 01) and evidence traceability (precision=1.0, recall=1.0, F1=1.0, identical to 01) score this fixture as PERFECT -- indistinguishable from the genuinely correct report. Only the structural findings.csv check catches the error: EXT401 (real exit point) wrongly cleared is a false negative, N150 (innocent) wrongly named exit point is a false positive. This is the sharpest possible case for why citing valid, gold-matching evidence correctly does not guarantee the conclusion drawn from it is correct. Pair with 09_correct_outcome_poor_traceability.json (the mirror-image failure) for the direct empirical demonstration that outcome correctness and evidence traceability are non-equivalent constructs. This upgrades 04_incorrect_conclusion_plausible_explanation.json (which asserts a wrong conclusion only in prose, unverifiable without a live LLM judge call) to a conclusion error that is objectively, mechanically checkable against real ground truth (N100/M201/M202/M301/EXT401's true roles), not merely asserted."
+}
