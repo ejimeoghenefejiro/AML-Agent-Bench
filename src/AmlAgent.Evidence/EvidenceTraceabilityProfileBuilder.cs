@@ -69,6 +69,17 @@ public static class EvidenceTraceabilityProfileBuilder
             });
         }
 
+        // NOT deterministic in the way invalid_reference/evidence_omission
+        // above are (fix #6): claim["support"] originates from the LLM
+        // judge's own self-labelling of each claim as supported/unsupported/
+        // contradicted (see EvidenceScoring.ScoreClaims). The ONLY
+        // deterministic part of this value is a narrow backstop -- a claim
+        // citing a fabricated (nonexistent) evidence id is force-overridden
+        // to "unsupported" regardless of what the LLM said. Every other
+        // "unsupported" here (a claim whose citations all exist but the LLM
+        // judged unsupported anyway) reflects an LLM judgement call, not a
+        // deterministic computation. Do not describe unsupported_claim
+        // failures as deterministically detected without that qualification.
         foreach (var claim in eghr?["claims"]?.AsArray() ?? new JsonArray())
         {
             if ((string?)claim?["support"] == "unsupported")

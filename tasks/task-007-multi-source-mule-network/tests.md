@@ -26,9 +26,9 @@ These tests fail loudly and cannot be satisfied by a vague natural-language answ
 
 Run by `aml-agent judge --task task-007-multi-source-mule-network --workspace <ws>` after the agent exits.
 
-The judge prompt loads `rubric.json`, `mule_network_report.md` (the candidate's report), and `data/transactions.csv` (the canonical, deduplicated ground-truth data, so the judge can verify citations). It scores seven dimensions on a 0–5 scale — see `rubric.json` for the full descriptions: `network_identification`, `evidence_grounding`, `avoids_unsupported_claims`, `evidence_traceability`, `avoids_false_implication`, `explanation_quality`, `audit_trail_awareness`.
+The judge prompt loads `rubric.json`, `mule_network_report.md` (the candidate's report), and `data/transactions.csv` (the canonical, deduplicated ground-truth data, so the judge can verify citations). It scores eight dimensions on a 0–5 scale — see `rubric.json` for the full descriptions: `network_identification`, `evidence_grounding`, `avoids_unsupported_claims`, `evidence_traceability`, `avoids_false_implication`, `typology_identification`, `explanation_quality`, `audit_trail_awareness`.
 
-`overall_percentage` is the sum of scores divided by `35` (the max). `verdict` is `PASS` when `overall_percentage >= pass_threshold_overall` (default `0.7`).
+`overall_percentage` is the sum of scores divided by `40` (the max). `verdict` is `PASS` when `overall_percentage >= pass_threshold_overall` (default `0.7`). Each dimension also carries a `category` (`outcome_correctness`/`evidence_quality`/`process_quality`) that `judge_report.json`'s `rubric_by_category`/`outcome_correctness` fields aggregate separately from `overall_percentage` — see [docs/evidence-traceability-framework.md#outcome-correctness-vs-task-performance](../../docs/evidence-traceability-framework.md#outcome-correctness-vs-task-performance).
 
 The judge writes `judge_report.json` to the workspace. [JudgeReportTests.cs](../../tests/AmlAgent.Tests/JudgeReportTests.cs) validates the file's shape and that the verdict is `PASS` when the report is present.
 
