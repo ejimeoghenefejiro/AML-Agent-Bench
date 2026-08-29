@@ -30,7 +30,15 @@
     },
     {
       "metric": "task_performance_percentage",
-      "label": "Task Performance (rubric score, proxy for detection performance)",
+      "label": "Task Performance (full rubric score, INCLUDES citation-quality dimensions -- not a clean detection-performance proxy, see outcome_correctness_percentage)",
+      "direction": "higher_is_better",
+      "threshold": 0.90,
+      "unit": "rate",
+      "required": true
+    },
+    {
+      "metric": "outcome_correctness_percentage",
+      "label": "Outcome Correctness (network reconstruction, typology, innocent-account clearing -- no citation-quality terms)",
       "direction": "higher_is_better",
       "threshold": 0.90,
       "unit": "rate",

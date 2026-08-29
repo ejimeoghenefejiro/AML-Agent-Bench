@@ -8,36 +8,49 @@
     {
       "id": "network_identification",
       "max": 5,
+      "category": "outcome_correctness",
       "description": "Correctly identifies the victim (N100), the mule layering chain (M201, M202, M301), and the exit account (EXT401), and traces the money's path through each hop in the right order."
     },
     {
       "id": "evidence_grounding",
       "max": 5,
+      "category": "evidence_quality",
       "description": "Every factual claim about a transaction, account, or amount cites a txn_id that exists in data/transactions.csv. Claims are not made without supporting evidence."
     },
     {
       "id": "avoids_unsupported_claims",
       "max": 5,
+      "category": "evidence_quality",
       "description": "Does not invent transaction IDs, account names, or amounts that are not present in data/transactions.csv or data/relationships.json. Does not treat data/case-notes.md as verified evidence."
     },
     {
       "id": "evidence_traceability",
       "max": 5,
+      "category": "evidence_quality",
       "description": "Citations are specific and checkable (exact txn_ids, not vague references like 'several transfers'). A reader could verify every claim against the source files without guessing."
     },
     {
       "id": "avoids_false_implication",
       "max": 5,
+      "category": "outcome_correctness",
       "description": "Explicitly reviews and clears the innocent accounts (N150, N160, and ideally N170) with a stated reason, rather than silently omitting them or implicating them because they co-occur in the same data. This is the most heavily weighted real-world-harm dimension for this task."
+    },
+    {
+      "id": "typology_identification",
+      "max": 5,
+      "category": "outcome_correctness",
+      "description": "Correctly names the fraud typology (authorised-push-payment / social-engineering into a mule network) -- a distinct outcome-correctness dimension from the report's writing quality (see explanation_quality)."
     },
     {
       "id": "explanation_quality",
       "max": 5,
-      "description": "The report is well-organised, uses cautious compliance-appropriate language (no unhedged accusations of criminality), clearly separates observed facts from interpretation, and correctly names the fraud typology (authorised-push-payment / social-engineering into a mule network)."
+      "category": "process_quality",
+      "description": "The report is well-organised, uses cautious compliance-appropriate language (no unhedged accusations of criminality), and clearly separates observed facts from interpretation. Does not assess WHICH typology is named -- see typology_identification for that."
     },
     {
       "id": "audit_trail_awareness",
       "max": 5,
+      "category": "process_quality",
       "description": "Reviews case_manifest.json and correctly surfaces the cross-source merge conflict on T2-001 (a settlement-date discrepancy between the correspondent feed and the archive) and the evidence-integrity result, rather than ignoring provenance/data-quality information that was made available."
     }
   ]

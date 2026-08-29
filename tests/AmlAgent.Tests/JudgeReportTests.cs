@@ -75,6 +75,51 @@ public class JudgeReportTests
     }
 
     [SkippableFact]
+    public void RubricByCategoryFieldsAreInternallyConsistent()
+    {
+        // Fix #5: whichever categories the task's rubric.json dimensions
+        // carry, each category's score/max/percentage must be internally
+        // consistent, and every category subtotal must be <= the full
+        // rubric total (a category is a subset of the whole, never more).
+        var p = ReportPath();
+        Skip.If(p is null, "no judge report");
+        var root = Report();
+        Skip.If(!root.TryGetProperty("rubric_by_category", out var byCategory), "no rubric_by_category (rubric predates fix #5)");
+
+        var overallScore = root.GetProperty("overall_score").GetInt32();
+        var overallMax = root.GetProperty("overall_max").GetInt32();
+
+        foreach (var category in byCategory.EnumerateObject())
+        {
+            var score = category.Value.GetProperty("score").GetInt32();
+            var max = category.Value.GetProperty("max").GetInt32();
+            Assert.True(score <= max, $"category '{category.Name}': score ({score}) exceeds max ({max})");
+            Assert.True(max <= overallMax, $"category '{category.Name}': max ({max}) exceeds overall_max ({overallMax})");
+            Assert.True(score <= overallScore, $"category '{category.Name}': score ({score}) exceeds overall_score ({overallScore})");
+
+            if (max > 0)
+                Assert.Equal(Math.Round((double)score / max, 4), category.Value.GetProperty("percentage").GetDouble());
+        }
+    }
+
+    [SkippableFact]
+    public void OutcomeCorrectness_WhenPresent_MatchesItsOwnCategoryInRubricByCategory()
+    {
+        // The convenience top-level "outcome_correctness" field must always
+        // agree with rubric_by_category["outcome_correctness"] -- it's a
+        // derived alias, not an independent computation that could drift.
+        var p = ReportPath();
+        Skip.If(p is null, "no judge report");
+        var root = Report();
+        Skip.If(!root.TryGetProperty("outcome_correctness", out var outcome) || outcome.ValueKind == JsonValueKind.Null,
+            "no outcome_correctness dimensions in this task's rubric");
+
+        var byCategory = root.GetProperty("rubric_by_category").GetProperty("outcome_correctness");
+        Assert.Equal(byCategory.GetProperty("score").GetInt32(), outcome.GetProperty("score").GetInt32());
+        Assert.Equal(byCategory.GetProperty("max").GetInt32(), outcome.GetProperty("max").GetInt32());
+    }
+
+    [SkippableFact]
     public void EghrFieldsArePresentAndConsistent()
     {
         var p = ReportPath();

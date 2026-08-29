@@ -292,7 +292,22 @@ internal static class AssuranceProfileBuilder
             ["eghr_rate"] = (double?)eghr?["rate"],
             ["evidence_traceability_f1"] = (double?)trace?["f1"],
             ["fabricated_citation_count"] = trace?["fabricated_citations"]?.AsArray()?.Count,
+            // Full rubric score (all dimensions, including citation-quality
+            // ones) -- a holistic "is this report good enough" gate. NOT the
+            // right variable for correlating against evidence traceability
+            // (see outcome_correctness_percentage below) -- fix #5.
             ["task_performance_percentage"] = (double?)judge["overall_percentage"],
+            // Construct-clean outcome-correctness score (fix #5): rubric
+            // dimensions tagged "outcome_correctness" only -- network
+            // reconstruction, typology, innocent-account clearing -- with no
+            // citation-quality terms. This is the variable H4 should
+            // correlate against evidence_traceability_f1/precision/recall;
+            // task_performance_percentage above contains evidence_traceability
+            // itself as one of its dimensions and would contaminate that
+            // comparison. Null when the task's rubric.json has no
+            // outcome_correctness-tagged dimensions (rubrics predating this
+            // fix), not 0 -- "not measured", not "measured as zero".
+            ["outcome_correctness_percentage"] = (double?)judge["outcome_correctness"]?["percentage"],
         };
     }
 

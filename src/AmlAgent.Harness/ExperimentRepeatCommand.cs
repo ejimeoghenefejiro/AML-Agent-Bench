@@ -12,7 +12,9 @@ namespace AmlAgent.Harness;
 /// Research-validation item 6: runs the SAME task + agent + model + configuration
 /// N times (each a genuine, independent nested `aml-harness --local` invocation --
 /// not a mock or a cached replay) and captures RAW per-run measurements: benchmark
-/// verdict, assurance decision, rubric score, EGHR, traceability precision/recall/
+/// verdict, assurance decision, rubric score, outcome-correctness score (fix #5 --
+/// citation-quality-free subset of the rubric, see docs/evidence-traceability-framework.md
+/// #outcome-correctness-vs-task-performance), EGHR, traceability precision/recall/
 /// F1, fabricated citation count, cited evidence ids, structured findings (if the
 /// task produces a *findings*.csv), and latency. Deliberately does NOT compute or
 /// invent a single "consistency score" across runs -- per the instructions, that
@@ -153,6 +155,7 @@ internal static class ExperimentRepeatCommand
             var metrics = profile?["metrics"]?.AsArray();
             double? Find(string metric) => (double?)metrics?.FirstOrDefault(m => (string?)m?["metric"] == metric)?["value"];
             record["rubric_overall_percentage"] = Find("task_performance_percentage");
+            record["outcome_correctness_percentage"] = Find("outcome_correctness_percentage");
             record["eghr_rate"] = Find("eghr_rate");
             record["traceability_f1"] = Find("evidence_traceability_f1");
             record["fabricated_citation_count"] = Find("fabricated_citation_count");

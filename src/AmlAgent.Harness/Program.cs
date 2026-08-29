@@ -771,9 +771,13 @@ public static class Program
     {
         var rows = new List<string[]>
         {
-            new[] { "Rubric score", $"{(int?)judge["overall_score"]}/{(int?)judge["overall_max"]} ({(double?)judge["overall_percentage"]:P1})" },
+            new[] { "Rubric score (full, includes citation-quality dims)", $"{(int?)judge["overall_score"]}/{(int?)judge["overall_max"]} ({(double?)judge["overall_percentage"]:P1})" },
             new[] { "Rubric verdict", (string?)judge["verdict"] ?? "-" },
         };
+
+        var outcome = judge["outcome_correctness"]?.AsObject();
+        if (outcome is not null)
+            rows.Add(new[] { "Outcome correctness (no citation-quality terms)", $"{(int?)outcome["score"]}/{(int?)outcome["max"]} ({FormatPercentOrNa(outcome["percentage"])})" });
 
         var eghr = judge["eghr"]?.AsObject();
         if (eghr is not null)

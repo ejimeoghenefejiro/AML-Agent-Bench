@@ -25,11 +25,11 @@ These are provisional, stated for design purposes, and must not be read as alrea
 
 **H3.** Evidence-constrained or retrieval-augmented agents achieve higher claim-support coverage than unconstrained tool-using agents.
 
-**H4.** Task success is positively but imperfectly associated with evidence traceability; therefore conventional task performance does not substitute for traceability evaluation. (The single preliminary Task 006 run — high rubric pass, low traceability recall — is directional feasibility evidence for H4, not a test of it.)
+**H4.** Task success is positively but imperfectly associated with evidence traceability; therefore conventional task performance does not substitute for traceability evaluation. (The single preliminary Task 006 run — high rubric pass, low traceability recall — is directional feasibility evidence for H4, not a test of it.) **"Task success" here means `outcome_correctness_percentage`** (network reconstruction, typology, innocent-account clearing — see [docs/evidence-traceability-framework.md#outcome-correctness-vs-task-performance](evidence-traceability-framework.md#outcome-correctness-vs-task-performance)), not the full qualitative rubric's `overall_percentage`/`task_performance_percentage`, which itself includes evidence-traceability-flavoured dimensions and would contaminate this comparison if used instead (fix #5).
 
 **H5.** Verifier-assisted architectures reduce invalid references and evidence mismatches relative to single-pass generation.
 
-**H6.** Evidence-oriented interventions improve traceability metrics without a practically significant reduction in AML task performance, subject to task complexity and model capability.
+**H6.** Evidence-oriented interventions improve traceability metrics without a practically significant reduction in AML task performance (again `outcome_correctness_percentage`, not `task_performance_percentage` — an intervention that raises evidence traceability would mechanically raise the full rubric score too, since evidence traceability is one of its dimensions, so using the full rubric here would bias H6 toward appearing true rather than testing it), subject to task complexity and model capability.
 
 ## Candidate factors
 

@@ -211,16 +211,34 @@ internal static class JudgeAgent
         }
 
         // Recompute overall to defend against arithmetic errors in the LLM output.
+        // Also recompute per-category subtotals (fix #5): rubric.json dimensions
+        // may each carry an optional "category" -- outcome_correctness,
+        // evidence_quality, or process_quality -- so the overall rubric score
+        // (a holistic "is this report good enough" gate, unchanged in meaning)
+        // stays separate from a construct-clean outcome-correctness score (no
+        // citation-quality terms) that H4 can actually correlate against
+        // evidence traceability without contaminating both sides of the
+        // comparison. See docs/evidence-traceability-framework.md
+        // #outcome-correctness-vs-task-performance.
         int overallScore = 0, overallMax = 0;
+        var dimensionCategories = dimensions
+            .Select(d => ((string)d!["id"]!, (string?)d["category"]))
+            .ToDictionary(t => t.Item1, t => t.Item2);
+        var scoredDimensions = new List<RubricCategoryScoring.ScoredDimension>();
+
         var scores = parsed["scores"]?.AsObject();
         if (scores is not null)
         {
-            foreach (var (_, node) in scores)
+            foreach (var (id, node) in scores)
             {
-                overallScore += (int?)node?["score"] ?? 0;
-                overallMax += (int?)node?["max"] ?? 0;
+                int s = (int?)node?["score"] ?? 0;
+                int m = (int?)node?["max"] ?? 0;
+                overallScore += s;
+                overallMax += m;
+                scoredDimensions.Add(new RubricCategoryScoring.ScoredDimension(id, s, m));
             }
         }
+        var categoryTotals = RubricCategoryScoring.ComputeCategoryTotals(scoredDimensions, dimensionCategories);
         double percentage = overallMax == 0 ? 0.0 : Math.Round((double)overallScore / overallMax, 4);
         string verdict = percentage >= passThreshold ? "PASS" : "FAIL";
 
@@ -232,6 +250,24 @@ internal static class JudgeAgent
         parsed["task"] = taskId;
         parsed["model"] = model;
         parsed["judged_at_utc"] = DateTime.UtcNow.ToString("o");
+
+        parsed["rubric_by_category"] = new JsonObject(categoryTotals.Select(kv => KeyValuePair.Create(
+            kv.Key,
+            (JsonNode?)new JsonObject
+            {
+                ["score"] = kv.Value.Score,
+                ["max"] = kv.Value.Max,
+                ["percentage"] = kv.Value.Percentage,
+            })));
+        // Convenience top-level alias for the specific field H4 needs: the
+        // outcome-correctness-only score, entirely free of the citation-quality
+        // dimensions (evidence_grounding, avoids_unsupported_claims,
+        // evidence_traceability, ...) that make up "evidence_quality" above.
+        // Null (not zero) when this rubric has no outcome_correctness-tagged
+        // dimensions at all, so a caller can't mistake "not measured" for "0%".
+        parsed["outcome_correctness"] = categoryTotals.TryGetValue("outcome_correctness", out var oc)
+            ? new JsonObject { ["score"] = oc.Score, ["max"] = oc.Max, ["percentage"] = oc.Percentage }
+            : null;
 
         // --- Legacy/secondary metric: Evidence-Grounded Hallucination Rate ---
         var claimInputs = ParseClaimInputs(parsed["claims"]);

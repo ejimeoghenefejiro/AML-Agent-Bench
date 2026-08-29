@@ -62,6 +62,7 @@ A working C#/Semantic Kernel agent, a polyglot Docker harness, a multi-format da
 4. Execute a real, independent-annotator gold-evidence round for at least one task, to start convergent-validity work.
 5. Run `aml-harness experiment repeat` / `experiment judge-repeat` at a statistically meaningful batch size (the current live evidence is a 2-run proof of concept, not a reliability study).
 6. Build the noise/distractor task variants described in `docs/experimental-design.md` and `validation/experiments/README.md`.
+7. ~~Separate task performance from traceability~~ — **done**: rubric.json dimensions now carry an optional `category` (`outcome_correctness`/`evidence_quality`/`process_quality`); `judge_report.json` gains `rubric_by_category` and a top-level `outcome_correctness` field via `AmlAgent.Evidence.RubricCategoryScoring`, and `assurance_profile.json` exposes `outcome_correctness_percentage` as a metric distinct from the full-rubric `task_performance_percentage` — see [docs/evidence-traceability-framework.md#outcome-correctness-vs-task-performance](evidence-traceability-framework.md#outcome-correctness-vs-task-performance). H4/H6 in `docs/experimental-design.md` now name `outcome_correctness_percentage` explicitly as the variable to use, since the old `task_performance_percentage` includes `evidence_traceability` as one of its own rubric dimensions and would contaminate any correlation against the deterministic traceability metrics.
 
 ## Proposed version milestone
 
