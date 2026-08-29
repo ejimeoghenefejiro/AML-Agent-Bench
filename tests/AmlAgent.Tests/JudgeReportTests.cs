@@ -120,6 +120,28 @@ public class JudgeReportTests
     }
 
     [SkippableFact]
+    public void MaterialClaims_WhenPresent_EveryEntryHasClaimIdAndAgentEvidenceArray()
+    {
+        // Fix #7: only meaningful for tasks whose evidence-annotations.json
+        // defines material_claims (task-007 today) -- skipped otherwise, same
+        // as every other conditional field in this file.
+        var p = ReportPath();
+        Skip.If(p is null, "no judge report");
+        var root = Report();
+        Skip.If(!root.TryGetProperty("material_claims", out var claims) || claims.ValueKind != JsonValueKind.Array || claims.GetArrayLength() == 0,
+            "no material_claims in this task's judge_report.json");
+
+        foreach (var claim in claims.EnumerateArray())
+        {
+            Assert.True(claim.TryGetProperty("claim_id", out var id) && id.GetString()!.Length > 0, "material claim missing claim_id");
+            Assert.True(claim.TryGetProperty("agent_evidence", out var evidence) && evidence.ValueKind == JsonValueKind.Array,
+                $"claim '{id}' missing agent_evidence array");
+            Assert.True(claim.TryGetProperty("material", out var material) && material.GetBoolean(),
+                $"claim '{id}' should be material == true (task-authored material claims are material by construction)");
+        }
+    }
+
+    [SkippableFact]
     public void EghrFieldsArePresentAndConsistent()
     {
         var p = ReportPath();

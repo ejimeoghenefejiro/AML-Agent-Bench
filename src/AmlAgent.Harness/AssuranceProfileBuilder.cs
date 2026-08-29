@@ -152,10 +152,16 @@ internal static class AssuranceProfileBuilder
             // above around the traceability failure taxonomy (see
             // AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder and
             // docs/evidence-traceability-framework.md). Fields not yet
-            // computable (claim_support_coverage, evidence_sufficiency_rate)
-            // are explicit nulls, never fabricated.
+            // computable (evidence_sufficiency_rate) are explicit nulls, never
+            // fabricated. claim_support_coverage/claim_level_precision/recall/f1
+            // (fix #7) are computed when judge_report.json carries a
+            // "material_claims" array (JudgeAgent.cs writes one when the task's
+            // evidence-annotations.json defines material claims -- task-007
+            // today); ClaimJson.ParseArray round-trips it back into typed
+            // Claim objects, staying null for every task that hasn't opted in.
             ["evidence_traceability_profile"] = EvidenceTraceabilityProfileBuilder.Build(
-                judge["eghr"]?.AsObject(), judge["evidence_traceability"]?.AsObject()),
+                judge["eghr"]?.AsObject(), judge["evidence_traceability"]?.AsObject(),
+                ParseMaterialClaimsOrNull(judge["material_claims"]?.AsArray())),
             ["case_evidence_integrity"] = caseIntegrity,
             ["provenance"] = new JsonObject
             {
@@ -279,6 +285,21 @@ internal static class AssuranceProfileBuilder
         };
 
         return (profile, assessment);
+    }
+
+    /// <summary>
+    /// Reconstructs typed Claim objects from judge_report.json's "material_claims"
+    /// array (see ClaimJson, JudgeAgent.cs fix #7). Returns null -- not an empty
+    /// list -- when the field is absent, so EvidenceTraceabilityProfileBuilder.Build
+    /// leaves claim_scores/claim_support_coverage/etc. as null ("not measured")
+    /// rather than an empty array ("measured, zero material claims") for every
+    /// task that hasn't opted into claim-level annotation.
+    /// </summary>
+    private static IReadOnlyList<Claim>? ParseMaterialClaimsOrNull(JsonArray? array)
+    {
+        if (array is null) return null;
+        var claims = ClaimJson.ParseArray(array);
+        return claims.Count == 0 ? null : claims;
     }
 
     /// <summary>Pulls the raw metric values this benchmark actually computes out of a judge_report.json-shaped object.</summary>

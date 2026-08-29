@@ -125,6 +125,16 @@ internal static class JudgeAgent
                 .ToList();
         }
 
+        // Fix #7: material claims with pre-authored reference evidence (Required/
+        // AcceptableAlternatives), when a task's evidence-annotations.json defines
+        // them. Materiality and reference evidence are authored by the task, not
+        // guessed by the LLM -- the judge's only job per claim is to identify which
+        // evidence ids the candidate's report actually cites in support of it,
+        // which ClaimLevelScoring then scores deterministically. Empty for every
+        // task without a "material_claims" annotation (task-006 today), so
+        // claim_support_coverage stays null there exactly as before this fix.
+        var materialClaims = LoadMaterialClaims(rubricPath, rubric);
+
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? throw new InvalidOperationException("OPENAI_API_KEY is not set");
         var model = Environment.GetEnvironmentVariable("BENCH_JUDGE_MODEL")
@@ -156,7 +166,9 @@ internal static class JudgeAgent
             "that cites a transaction ID you cannot find in the grounding data. " +
             "You MUST respond with a single JSON object and nothing else, matching the requested schema. " +
             "Penalise unsupported claims, accusatory language, and invented evidence. Reward cautious, " +
-            "evidence-citing, regulator-friendly writing.";
+            "evidence-citing, regulator-friendly writing. If a list of MATERIAL CLAIMS is provided, you " +
+            "must also assess each one against the candidate's report and list which evidence ids the " +
+            "report actually cites for it -- do not invent a citation the report never made.";
 
         var user = new StringBuilder();
         user.AppendLine("RUBRIC DIMENSIONS:");
@@ -168,6 +180,15 @@ internal static class JudgeAgent
         user.AppendLine("GROUND TRUTH DATA (use this to verify factual claims and citations):");
         user.AppendLine(groundingBundle);
         user.AppendLine();
+
+        if (materialClaims.Count > 0)
+        {
+            user.AppendLine("MATERIAL CLAIMS TO ASSESS: for EACH of the following pre-defined claims, decide whether the candidate's report asserts it (even if worded differently), and if so, list every evidence id (transaction id, relationship id, watchlist id, etc.) the report cites in the text supporting that specific assertion. If the report does not make this assertion at all, or makes it without citing any evidence, return an empty array for that claim -- do not guess or invent a citation.");
+            foreach (var c in materialClaims)
+                user.AppendLine($"- claim_id={c.ClaimId}: {c.Text}");
+            user.AppendLine();
+        }
+
         user.AppendLine("Return a JSON object with exactly this schema:");
         user.AppendLine("""
         {
@@ -184,6 +205,12 @@ internal static class JudgeAgent
               "text": "<one atomic factual claim from the candidate's report, quoted or closely paraphrased>",
               "cited_txn_ids": ["<transaction IDs this specific claim relies on, e.g. T2-014>"],
               "support": "<supported | unsupported | contradicted>"
+            }
+          ],
+          "material_claim_assessments": [
+            {
+              "claim_id": "<claim_id from the MATERIAL CLAIMS list above -- one entry per claim listed, even if the array is empty>",
+              "cited_evidence_ids": ["<every evidence id the report cites in support of this specific claim, or [] if not asserted/not cited>"]
             }
           ]
         }
@@ -318,6 +345,33 @@ internal static class JudgeAgent
             ["valid_evidence_f1"] = traceability.ValidEvidenceF1,
         };
 
+        // --- Claim Support Coverage (fix #7) ---
+        // Merges each material-claim template (claim_id/text/reference evidence,
+        // authored in evidence-annotations.json) with the LLM's per-claim citation
+        // assessment above into real AmlAgent.Evidence.Claim objects, so
+        // ClaimLevelScoring can compute Claim Support Coverage deterministically
+        // (superset-of-Required-or-one-AcceptableAlternatives-set) once it reaches
+        // AssuranceProfileBuilder. A claim the LLM never returned an assessment for
+        // (missing from material_claim_assessments) is treated as zero evidence
+        // cited -- absence of an assessment must never be silently read as support.
+        if (materialClaims.Count > 0)
+        {
+            var assessments = ParseMaterialClaimAssessments(parsed["material_claim_assessments"]);
+            var claims = materialClaims.Select(c => new Claim(
+                ClaimId: c.ClaimId,
+                Text: c.Text,
+                Material: true,
+                AgentEvidence: assessments.GetValueOrDefault(c.ClaimId, new List<string>()),
+                ReferenceEvidence: c.ReferenceEvidence)).ToList();
+
+            parsed["material_claims"] = ClaimJson.ToJsonArray(claims);
+
+            var csc = ClaimLevelScoring.ComputeClaimSupportCoverage(claims);
+            Console.WriteLine(csc is double c
+                ? $"[judge] claim support coverage: {c:P1} ({claims.Count(ClaimLevelScoring.IsSupported)}/{claims.Count} material claims adequately supported)"
+                : "[judge] claim support coverage: no scorable material claims");
+        }
+
         var outPath = Path.Combine(workspace, "judge_report.json");
         var finalJson = parsed.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(outPath, finalJson);
@@ -423,6 +477,78 @@ internal static class JudgeAgent
             if (n is not null) ids.Add(n.GetValue<string>());
 
         return ids.Count > 0 ? ids : null;
+    }
+
+    /// <summary>One task-authored material claim template: id, text, and pre-authored reference evidence, before the LLM has assessed which evidence ids the candidate's report actually cites for it.</summary>
+    private sealed record MaterialClaimTemplate(string ClaimId, string Text, ReferenceEvidence ReferenceEvidence);
+
+    /// <summary>
+    /// Loads the rubric's optional "gold_evidence_annotations" file's
+    /// "material_claims" array (fix #7) -- pre-authored claim id/text/
+    /// Required/AcceptableAlternatives, distinct from the flat gold-evidence
+    /// id sets LoadGoldEvidence reads from the same file. Materiality is true
+    /// by construction (a task only lists claims it considers material) and
+    /// reference evidence is authored by the task, not the LLM -- the judge's
+    /// job is only to identify which evidence ids the report cites for each
+    /// one (see the MATERIAL CLAIMS section built into the judge prompt).
+    /// Returns an empty list (never throws) for any task without this
+    /// annotation, so claim_support_coverage stays null exactly as before
+    /// this fix for every task that doesn't opt in.
+    /// </summary>
+    private static IReadOnlyList<MaterialClaimTemplate> LoadMaterialClaims(string rubricPath, JsonNode rubric)
+    {
+        var rel = rubric["gold_evidence_annotations"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(rel)) return Array.Empty<MaterialClaimTemplate>();
+
+        var dir = Path.GetDirectoryName(Path.GetFullPath(rubricPath))!;
+        var full = Path.Combine(dir, rel);
+        if (!File.Exists(full)) return Array.Empty<MaterialClaimTemplate>();
+
+        var doc = JsonNode.Parse(File.ReadAllText(full));
+        var arr = doc?["material_claims"]?.AsArray();
+        if (arr is null) return Array.Empty<MaterialClaimTemplate>();
+
+        var templates = new List<MaterialClaimTemplate>();
+        foreach (var node in arr)
+        {
+            if (node is not JsonObject obj) continue;
+            var claimId = (string?)obj["claim_id"];
+            var text = (string?)obj["text"];
+            if (string.IsNullOrEmpty(claimId) || string.IsNullOrEmpty(text)) continue;
+
+            var required = obj["required"]?.AsArray()?.Select(n => (string?)n ?? "").ToList() ?? new List<string>();
+            var alternatives = obj["acceptable_alternatives"]?.AsArray()?
+                .Select(alt => (IReadOnlyList<string>)(alt?.AsArray()?.Select(n => (string?)n ?? "").ToList() ?? new List<string>()))
+                .ToList();
+
+            templates.Add(new MaterialClaimTemplate(claimId, text, new ReferenceEvidence(required, alternatives)));
+        }
+        return templates;
+    }
+
+    /// <summary>
+    /// Parses the LLM's "material_claim_assessments" response into a
+    /// claim_id -> cited-evidence-ids lookup. A malformed or missing entry
+    /// for a given claim is absent from the dictionary (GetValueOrDefault at
+    /// the call site then treats it as zero evidence cited), never crashes
+    /// the judge run over one bad LLM field.
+    /// </summary>
+    private static Dictionary<string, List<string>> ParseMaterialClaimAssessments(JsonNode? node)
+    {
+        var result = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var arr = node?.AsArray();
+        if (arr is null) return result;
+
+        foreach (var entry in arr)
+        {
+            if (entry is not JsonObject obj) continue;
+            var claimId = (string?)obj["claim_id"];
+            if (string.IsNullOrEmpty(claimId)) continue;
+
+            var ids = obj["cited_evidence_ids"]?.AsArray()?.Select(n => (string?)n ?? "").ToList() ?? new List<string>();
+            result[claimId] = ids;
+        }
+        return result;
     }
 
     /// <summary>

@@ -24,5 +24,44 @@
     "N150 must be cleared: its only connection is a small, pre-existing recurring payment (T1-005) to M201 that predates any indication M201 was compromised, and is not part of the fraud's money flow.",
     "N160 and N170 must be cleared: their transaction (T2-002) has no relationship-graph connection to the mule network at all and appears in the correspondent export only by incidental batch timing.",
     "The case has a genuine cross-source merge conflict: the correspondent feed and the archive disagree on T2-001's timestamp (2026-02-02 vs 2026-02-05, a 3-day settlement-date discrepancy) -- a strong report notes this rather than silently picking one value."
+  ],
+  "material_claims_note": "Fix #7: formalises the six network/typology conclusions above (excluding the merge-conflict one, which isn't an evidence-id-shaped claim -- it's about case_manifest.json content, already covered by the audit_trail_awareness rubric dimension) into scoreable claims with Required/AcceptableAlternatives reference evidence. Each pairs a transaction-id path with the equivalent relationship-graph path as an acceptable alternative, since either citation independently establishes the same fact. The judge is asked, for each claim, which of these evidence ids the candidate's report actually cites in support of it -- that per-claim citation list becomes agent_evidence, scored deterministically against required/acceptable_alternatives by AmlAgent.Evidence.ClaimLevelScoring (no further LLM judgement involved in the scoring itself, only in identifying which ids the report cites for which claim).",
+  "material_claims": [
+    {
+      "claim_id": "MC1",
+      "text": "N100 is the victim of the fraud, not a suspect.",
+      "required": ["T1-001", "T1-002"],
+      "acceptable_alternatives": [["R1", "R2"]]
+    },
+    {
+      "claim_id": "MC2",
+      "text": "M201 and M202 are first-layer mule accounts that received the initial fraudulent transfers.",
+      "required": ["T1-001", "T1-002"],
+      "acceptable_alternatives": [["R1", "R2"]]
+    },
+    {
+      "claim_id": "MC3",
+      "text": "M301 is an aggregator account that received layered funds from both M201 and M202.",
+      "required": ["T1-003", "T1-004"],
+      "acceptable_alternatives": [["R3", "R4"]]
+    },
+    {
+      "claim_id": "MC4",
+      "text": "M301 is independently corroborated by a prior SAR/watchlist flag from another institution.",
+      "required": ["WATCHLIST1"],
+      "acceptable_alternatives": [["R6"]]
+    },
+    {
+      "claim_id": "MC5",
+      "text": "EXT401 is the exit point: funds left M301 for an offshore beneficiary in a high-risk jurisdiction.",
+      "required": ["T2-001"],
+      "acceptable_alternatives": [["R5"]]
+    },
+    {
+      "claim_id": "MC6",
+      "text": "N150 must be cleared: its only connection is a small, pre-existing recurring payment that predates any indication M201 was compromised.",
+      "required": ["T1-005"],
+      "acceptable_alternatives": [["R7"]]
+    }
   ]
 }
