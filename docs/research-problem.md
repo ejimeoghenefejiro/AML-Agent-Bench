@@ -21,7 +21,7 @@ An autonomous AML agent may:
 - make a claim without any identifiable supporting evidence;
 - provide an evidence chain that another analyst cannot reproduce.
 
-AML compliance is high-stakes and error-sensitive: a false positive delays legitimate transactions and inflates cost; a false negative lets illicit funds move undetected. An unsupported or untraceable claim in a suspicious-activity narrative can mislead an investigation, contaminate a regulatory filing, and create legal exposure — regardless of whether the agent's overall conclusion happens to be correct. FATF (2021), the EU AI Act (2024) and supervisory model-risk guidance (SR 11-7, 2011) all require that high-impact financial-system outputs remain auditable and traceable to their evidentiary basis; existing agent benchmarks contain no AML tasks and no evidentiary-traceability scoring at all.
+AML compliance is high-stakes and error-sensitive: a false positive delays legitimate transactions and inflates cost; a false negative lets illicit funds move undetected. An unsupported or untraceable claim in a suspicious-activity narrative can mislead an investigation, contaminate a regulatory filing, and create legal exposure — regardless of whether the agent's overall conclusion happens to be correct. FATF (2021), the EU AI Act (2024) and supervisory model-risk guidance (SR 11-7, 2011) each impose documentation, record-keeping, auditability, and human-oversight requirements on high-risk or automated financial-system outputs; none of them mandate "evidence traceability" by that name or as a specific technical construct, but the recurring expectation across all three is that a flagged transaction or automated decision can be explained, reviewed, and traced back to what supports it. Evidence traceability, as defined and operationalised in this research, is one way to make that broader documentation/auditability/human-oversight expectation empirically measurable for autonomous agents specifically — not a claim that these instruments impose this exact requirement. Among the general-purpose and AML-oriented agent benchmarks reviewed for this research (see the literature review in the PhD proposal, and AgentBench/τ-bench/GAIA above), none combine AML-specific tasks with evidentiary-traceability scoring — a gap in the literature surveyed, not an assertion that no such benchmark exists anywhere.
 
 ## Research problem
 
@@ -52,7 +52,7 @@ Existing citation, attribution, grounding, and general-purpose agent-evaluation 
 | Benchmark gap | AML evaluation typically emphasises detection/prediction rather than evidentiary reconstruction. | Create controlled AML scenarios with gold claim-evidence mappings (see [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md)). |
 | Intervention gap | It is not enough to diagnose weak traceability. | Test evidence-oriented agent designs that attempt to improve traceability without sacrificing task performance (RQ4; see [docs/experimental-design.md](experimental-design.md)). |
 
-The doctoral novelty is the validated framework and benchmark, not the invention of precision, recall, or F1 — see [docs/validation-plan.md](validation-plan.md) for how content validity, construct validity, convergent validity, discriminant validity, reliability, reproducibility, and sensitivity to controlled traceability degradation are each demonstrated (or honestly marked as not yet demonstrated).
+The doctoral novelty is the framework and benchmark together with their empirical validation, not the invention of precision, recall, or F1 — see [docs/validation-plan.md](validation-plan.md) for how content validity, construct validity, convergent validity, discriminant validity, reliability, reproducibility, and sensitivity to controlled traceability degradation are each demonstrated (or honestly marked as not yet demonstrated).
 
 ## Proposed contribution
 
@@ -98,7 +98,7 @@ The current tasks use small, hand-authored synthetic CSV/JSON/Parquet datasets (
 ## Expected contribution to PhD
 
 1. **C1 — Conceptual** — a formal definition and taxonomy of evidence traceability and traceability failure modes for autonomous AML investigations.
-2. **C2 — Methodological** — a validated claim-level measurement framework covering evidence validity, precision, recall, coverage, sufficiency, and reconstruction.
+2. **C2 — Methodological** — a claim-level measurement framework covering evidence validity, precision, recall, coverage, sufficiency, and reconstruction, together with its empirical validation (see [docs/validation-plan.md](validation-plan.md)) — validation is planned work, not yet performed; see [docs/research-scope-mapping.md](research-scope-mapping.md) for current status.
 3. **C3 — Benchmark/data** — a reproducible family of AML investigative tasks with expert-annotated claim-evidence reference structures.
 4. **C4 — Empirical** — evidence on how model choice, architecture, task complexity, and evidence conditions affect traceability.
 5. **C5 — Intervention** — experimental evidence on which agent-design interventions improve traceability while preserving task performance.

@@ -18,7 +18,7 @@
 >
 > Methodologically, the benchmark contributes a reusable evaluation architecture. A reference agent implemented in C# with Microsoft Semantic Kernel acts both as the primary subject of investigation and as the LLM-as-judge that scores other agents. A language-agnostic Docker harness enables any agent — packaged as a folder, a pre-built image, or a user submission — to be benchmarked against identical tasks, supporting cross-architecture and cross-language comparison.
 >
-> The research contributes a formal framework for evidence traceability in agentic AML investigation, a validated measurement methodology, empirical evidence concerning the evidentiary performance of contemporary AI agents, and an open-source benchmark implementation. AML-Agent-Bench is not intended to determine whether AI agents should autonomously make financial-crime decisions; it is intended to provide reproducible evidence concerning whether their investigative outputs can be independently traced and reviewed before supporting human decision-making.
+> The research will contribute a formal framework for evidence traceability in agentic AML investigation, a measurement methodology together with its empirical validation, evidence concerning the evidentiary performance of contemporary AI agents, and an open-source benchmark implementation. AML-Agent-Bench is not intended to determine whether AI agents should autonomously make financial-crime decisions; it is intended to provide reproducible evidence concerning whether their investigative outputs can be independently traced and reviewed before supporting human decision-making.
 
 **Keywords:** agentic AI · autonomous AI agents · anti-money laundering · evidence traceability · claim–evidence mapping · benchmark evaluation · auditability · reproducibility · RegTech · LLM-as-judge · Semantic Kernel · FATF · EU AI Act
 
@@ -66,7 +66,7 @@ Concretely, today's three tasks test whether an agent can:
 - **cite evidence by transaction ID** when writing about suspicious activity
 - **separate observed facts from analytical assumptions**
 - use **regulator-friendly, compliance-aware language**
-- avoid hallucinated transactions, accounts or amounts
+- **ground every claim in real, existing evidence** — no fabricated transactions, accounts, or amounts (see the [traceability failure taxonomy](docs/evidence-traceability-framework.md#traceability-failure-taxonomy)'s `invalid_reference`/`unsupported_claim`, which replace "hallucination" as this benchmark's organising vocabulary — see [Legacy: the EGHR metric](docs/evidence-traceability-framework.md#legacy-eghr-metric) for why that older term is still kept alive in code, not in framing)
 - produce **deterministic, schema-conformant outputs** that can be re-validated
 
 A second goal is methodological: **make this evaluation reproducible and language-agnostic** so different agent implementations and architectures (C# / Python / TypeScript / Go; single-agent, retrieval-augmented, multi-agent) can be compared on identical tasks.
@@ -77,7 +77,7 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 
 ## 2. What's in the box
 
-### The four projects, in plain English
+### The six projects, in plain English
 
 | Project | What it is | Exam analogy |
 |---|---|---|
@@ -86,6 +86,7 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 | **AmlAgent.Oracle** | A hand-written correct answer used to sanity-check the bench. | The **marking scheme** — the known-correct answers, used to prove the bench itself works. |
 | **AmlAgent.Tests** | Rule-based tests (xUnit) that check the agent's output is correct. | The **rubric** — the deterministic rules every answer must satisfy. |
 | **AmlAgent.Evidence** | Pure, dependency-free scoring logic for the benchmark's evidence-traceability metrics (citation precision/recall) plus the legacy EGHR claim-support check. No LLM, network or file I/O. | The **statistician** — turns raw claims and citations into the actual traceability and legacy-hallucination numbers, with no opinion of its own. |
+| **AmlAgent.Adapters** | The multi-format data-adapter layer: loads and merges a case from heterogeneous sources (CSV/JSON/Parquet/GraphML, and SQL Server/PostgreSQL/Neo4j where configured) into one canonical case, with cross-source evidence-integrity validation. | The **records office** — pulls files from every source system into one case folder before the exam even starts. |
 
 **Put together:** the **Harness** (invigilator) gives the **Agent** (candidate) the AML task, then marks its output using the **Tests** (rubric) and the **Agent-as-judge** (reviewer). The **Oracle** (marking scheme) is the gold-standard answer used to prove the marking process itself is sound.
 
@@ -98,7 +99,8 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 | **Harness** | `src/AmlAgent.Harness/` | Benchmark runner; supports `--local` (no Docker) and Docker modes; writes consolidated `bench_result.json` per run |
 | **LLM-as-judge** | `agents/csharp-sk/Agent/JudgeAgent.cs` | The same SK core grades qualitative regulatory properties against a `rubric.json`, and computes EGHR + evidence traceability |
 | **Evidence scoring** | `src/AmlAgent.Evidence/` | Pure, unit-tested logic for evidence-traceability citation precision/recall (primary) and the legacy EGHR claim-support check (secondary) |
-| **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort / citation assertions across two tasks and the judge report |
+| **Data adapters** | `src/AmlAgent.Adapters/` | Multi-format/multi-source case loading (CSV/JSON/Parquet/GraphML/SQL Server/PostgreSQL/Neo4j), merge, and evidence-integrity validation into one canonical case |
+| **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort assertions across all three tasks; citation/judge-report assertions across the two tasks (task-006, task-007) that have a `rubric.json` and a live judge |
 | **Tasks** | `tasks/<task-id>/` | Self-contained task definitions: brief + data + expected behaviour + tests + rubric |
 | **Submissions** | `submissions/` (mostly gitignored) | Drop point for external agents; ships with one reference Python baseline |
 | **Run results** | `results/` (gitignored JSONs, tracked README) | One `bench_result.json` per run, ready for cross-run aggregation |
@@ -805,7 +807,7 @@ partial proxy, and what's not started yet, see
 Stated plainly, not to be discovered by reading the code:
 
 - The current gold evidence set is small and single-author (no independent or multi-annotator validation yet — see [docs/evidence-annotation-protocol.md](docs/evidence-annotation-protocol.md)).
-- Claim-level evidence sufficiency and claim-support coverage are not yet implemented (see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md)).
+- Claim-support coverage is live for task-007 only (single-author `material_claims` annotation, no multi-annotator validation); task-006 has none. Claim-level evidence sufficiency has an annotation schema and fixtures but no scoring implementation, deliberately, pending a real validated annotation round (see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md)).
 - The task set is small (three tasks across three complexity levels; see [docs/research-problem.md](docs/research-problem.md#task-complexity-taxonomy)).
 - Current preliminary results (`docs/preliminary-results.md`) are single-run, single-model/task data points, not a controlled study.
 - LLM-based semantic judgement (the judge's claim-support labels) is not yet validated against human raters.
