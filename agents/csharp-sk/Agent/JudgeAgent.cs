@@ -39,6 +39,22 @@ namespace AmlAgent.Agent;
 // </summary>
 internal static class JudgeAgent
 {
+    /// <summary>
+    /// Schema version for judge_report.json's own top-level shape (fix #12) --
+    /// distinct from evidence_traceability_profile's own SchemaVersion
+    /// (AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder), which versions
+    /// a nested block that's re-derived downstream in assurance_profile.json,
+    /// not this file's own field set. Never versioned before this fix, despite
+    /// judge_report.json's shape growing substantially across several fixes
+    /// (valid_evidence_precision/f1, rubric_by_category, outcome_correctness,
+    /// material_claims) -- baselined at 1.0 now rather than backdated, since
+    /// there was no prior version to be consistent with. Bump MINOR for an
+    /// additive field, MAJOR for anything a consumer parsing this file would
+    /// need to change code for (rename, removal, retyped/repurposed field).
+    /// See docs/evidence-traceability-framework.md#schema-versioning.
+    /// </summary>
+    private const string SchemaVersion = "1.0";
+
     public static async Task<int> RunAsync(string[] args)
     {
         string? taskId = null;
@@ -277,6 +293,7 @@ internal static class JudgeAgent
         parsed["task"] = taskId;
         parsed["model"] = model;
         parsed["judged_at_utc"] = DateTime.UtcNow.ToString("o");
+        parsed["schema_version"] = SchemaVersion;
 
         parsed["rubric_by_category"] = new JsonObject(categoryTotals.Select(kv => KeyValuePair.Create(
             kv.Key,

@@ -24,17 +24,36 @@ namespace AmlAgent.Evidence;
 ///
 /// The optional `claims` parameter is the claim-level model
 /// (docs/evidence-traceability-framework.md#formal-claim-evidence-model,
-/// AmlAgent.Evidence.Claim/ReferenceEvidence/ClaimLevelScoring). No current
-/// live caller passes it -- judge_report.json's "claims" array today only
-/// carries {text, cited_txn_ids, support} for the EGHR check, not
-/// {claim_id, material, reference_evidence} -- so in the live path this
-/// stays null and every claim-level field stays null exactly as before this
-/// parameter was added. It exists so claim-level scoring is ready to use the
-/// moment a real source of claim-level annotations exists, without another
-/// schema change.
+/// AmlAgent.Evidence.Claim/ReferenceEvidence/ClaimLevelScoring). Live for
+/// task-007 since fix #7 (agents/csharp-sk/Agent/JudgeAgent.cs ->
+/// AmlAgent.Harness.AssuranceProfileBuilder); still null for any task
+/// without a `material_claims` annotation, in which case every claim-level
+/// field below stays null exactly as before that parameter existed.
+///
+/// SCHEMA VERSIONING (fix #12): this block carries its own `schema_version`,
+/// independent of assurance_profile.json's own top-level `schema_version`
+/// (AmlAgent.Harness.AssuranceProfileBuilder) -- this block has grown
+/// through several rounds of additive field changes (RVR, the precision/
+/// valid_evidence_precision split, claim-level fields) without ever being
+/// versioned, which is precisely how a later claim-level schema change could
+/// silently break a consumer with no signal that anything moved. Bump the
+/// MINOR component (e.g. 1.0 -> 1.1) for additive, backward-compatible
+/// changes (a new field, a previously-always-null field becoming
+/// sometimes-populated); bump MAJOR (e.g. 1.x -> 2.0) for anything a
+/// consumer parsing this object would need to change code for: a field
+/// renamed, removed, or changing type/meaning. See
+/// docs/evidence-traceability-framework.md#schema-versioning.
 /// </summary>
 public static class EvidenceTraceabilityProfileBuilder
 {
+    /// <summary>
+    /// Current schema_version for the object this method returns. Bump per
+    /// the policy in this class's own doc comment whenever the shape below
+    /// changes -- do not add/remove/retype a field without also deciding
+    /// whether this needs to move.
+    /// </summary>
+    public const string SchemaVersion = "1.0";
+
     public static JsonObject Build(JsonObject? eghr, JsonObject? evidenceTraceability, IReadOnlyList<Claim>? claims = null)
     {
         var citedDistinct = (int?)evidenceTraceability?["cited_txn_ids_distinct"];
@@ -112,6 +131,7 @@ public static class EvidenceTraceabilityProfileBuilder
 
         return new JsonObject
         {
+            ["schema_version"] = SchemaVersion,
             ["reference_validity_rate"] = referenceValidityRate,
             ["evidence_precision"] = evidenceTraceability?["precision"]?.DeepClone(),
             ["evidence_recall"] = evidenceTraceability?["recall"]?.DeepClone(),

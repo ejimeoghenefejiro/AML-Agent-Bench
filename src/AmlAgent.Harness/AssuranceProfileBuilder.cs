@@ -27,6 +27,24 @@ internal static class AssuranceProfileBuilder
 {
     private const string BenchmarkVersion = "AML-Agent-Bench 0.1 (PhD research prototype)";
 
+    /// <summary>
+    /// Schema version for assurance_profile.json's own top-level envelope
+    /// (fix #12) -- distinct from the nested evidence_traceability_profile
+    /// block's own SchemaVersion (AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder),
+    /// which can change independently without moving this one. Bumped from
+    /// "0.2" to "0.3" here: several additive fields have landed in the
+    /// "metrics" array and nested traceability block since "0.2" was set
+    /// (outcome_correctness_percentage, valid_evidence_precision/f1,
+    /// claim_support_coverage now populated for task-007) without ever
+    /// bumping this field -- exactly the silent-drift risk fix #12 exists to
+    /// close off going forward. Bump MINOR for additive changes (a new
+    /// top-level or metrics field, a previously-always-absent value becoming
+    /// populated); bump MAJOR for anything a consumer parsing this file
+    /// would need to change code for. See
+    /// docs/evidence-traceability-framework.md#schema-versioning.
+    /// </summary>
+    private const string SchemaVersion = "0.3";
+
     public static JsonObject? Build(JsonObject benchResult, string workspace, string repoRoot, string? policyPathOverride)
     {
         var judge = benchResult["judge"]?.AsObject();
@@ -86,7 +104,7 @@ internal static class AssuranceProfileBuilder
 
         var profile = new JsonObject
         {
-            ["schema_version"] = "0.2",
+            ["schema_version"] = SchemaVersion,
             ["disclaimer"] = "PhD research prototype, not a certification. See assurance/README.md for exactly what is and is not measured. A generated PASS_WITH_CONDITIONS or PASS reflects only the metrics this benchmark actually evaluates, listed under 'metrics' -- it is not a claim of regulatory approval or compliance.",
             ["generated_at_utc"] = DateTime.UtcNow.ToString("o"),
 

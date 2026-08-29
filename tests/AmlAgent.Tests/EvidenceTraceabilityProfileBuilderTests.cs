@@ -34,6 +34,18 @@ public class EvidenceTraceabilityProfileBuilderTests
     };
 
     [Fact]
+    public void Build_AlwaysIncludesSchemaVersion()
+    {
+        // Fix #12: this block carries its own schema_version, independent of
+        // assurance_profile.json's own top-level one, so a later claim-level
+        // schema change has an explicit version signal instead of silently
+        // changing shape underneath existing consumers.
+        var profile = EvidenceTraceabilityProfileBuilder.Build(null, null);
+        Assert.Equal(EvidenceTraceabilityProfileBuilder.SchemaVersion, (string?)profile["schema_version"]);
+        Assert.False(string.IsNullOrWhiteSpace((string?)profile["schema_version"]));
+    }
+
+    [Fact]
     public void Build_ValidCitationNoFabrication_ReferenceValidityRateIsOne()
     {
         var profile = EvidenceTraceabilityProfileBuilder.Build(

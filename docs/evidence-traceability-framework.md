@@ -199,3 +199,19 @@ The LLM judge is not the ground-truth evaluator. Deterministic checks are prefer
 **Deterministic today:** whether a transaction ID exists; whether a cited ID belongs to the allowed case; set overlap with curated evidence; reference validity rate; precision/recall/F1 arithmetic; provenance hashes; schema validation.
 
 **Requires semantic judgement (LLM, eventually validated against humans):** whether a valid record actually supports a natural-language claim; whether evidence is sufficient for the strength of the conclusion; whether two differently-worded claims are materially equivalent. Any LLM-based semantic evaluator here must eventually be validated against human annotation (see [docs/validation-plan.md](validation-plan.md#convergent-validity)) before its output can be treated as more than a provisional signal. Judge repeatability itself is measured, not assumed — see `validation/experiments/README.md` item 7 and `src/AmlAgent.Harness/ExperimentJudgeRepeatCommand.cs`.
+
+## Schema versioning
+
+**Fix #12.** `judge_report.json`, the nested `evidence_traceability_profile` block inside `assurance_profile.json`, and `assurance_profile.json`'s own top-level envelope each carry an explicit `schema_version` field, versioned independently of one another:
+
+| File / block | Field | Owner | Current value |
+|---|---|---|---|
+| `judge_report.json` (top-level) | `schema_version` | `agents/csharp-sk/Agent/JudgeAgent.cs` (`JudgeAgent.SchemaVersion`) | `"1.0"` |
+| `assurance_profile.json` → `evidence_traceability_profile` | `schema_version` | `AmlAgent.Evidence.EvidenceTraceabilityProfileBuilder.SchemaVersion` | `"1.0"` |
+| `assurance_profile.json` (top-level envelope) | `schema_version` | `AmlAgent.Harness.AssuranceProfileBuilder` (`AssuranceProfileBuilder.SchemaVersion`) | `"0.3"` |
+
+None of these existed before fix #12, despite all three shapes having grown substantially across fixes #1–#9 (RVR, the precision/`valid_evidence_precision` split, `rubric_by_category`/`outcome_correctness`, `material_claims`, `claim_support_coverage`) with zero version signal at any point — exactly the silent-incompatibility risk this fix closes off. `bench_result.json` (`schema_version: "1.0"`, `AmlAgent.Harness.ReportBuilder`) and `case_manifest.json`/canonical-case datasets (`AmlAgent.Adapters.Canonical.CanonicalSchema`, checked for mismatch by `CanonicalCaseMerger`) were already versioned before this fix; these three were the gap.
+
+**Why three independent versions, not one shared number:** `evidence_traceability_profile` is re-derived inside `AssuranceProfileBuilder.Build` from `judge_report.json`'s fields — its shape can change (e.g. a new claim-level field) without the outer `assurance_profile.json` envelope's own top-level fields (`policy`, `deployment_decision`, `provenance`, ...) changing at all, and vice versa. A single shared version number would force every consumer to treat an unrelated change as a breaking one.
+
+**Bump policy** (documented on each `SchemaVersion` constant, not just here): increment the MINOR component for additive, backward-compatible changes — a new field, or a field that was always `null` becoming sometimes-populated. Increment MAJOR for anything a consumer parsing the file/block would need to change code for: a field renamed, removed, or changing type/meaning. None of the three was retroactively bumped for past additive changes (fix #1's RVR, fix #4's precision split, fix #5's `rubric_by_category`, fix #7's `material_claims`) — they are baselined now, going forward, rather than backdated to a history no version field was ever tracking.

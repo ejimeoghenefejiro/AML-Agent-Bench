@@ -45,6 +45,19 @@ public class JudgeReportTests
     }
 
     [SkippableFact]
+    public void JudgeReportHasNonEmptySchemaVersion()
+    {
+        // Fix #12: judge_report.json's shape has grown across several fixes
+        // without ever being versioned -- baselined now so a future
+        // claim-level or traceability-block change has an explicit signal.
+        var p = ReportPath();
+        Skip.If(p is null, "no judge report");
+        var root = Report();
+        Assert.True(root.TryGetProperty("schema_version", out var version), "missing field: schema_version");
+        Assert.False(string.IsNullOrWhiteSpace(version.GetString()));
+    }
+
+    [SkippableFact]
     public void JudgeOverallPercentageMatchesScores()
     {
         var p = ReportPath();
