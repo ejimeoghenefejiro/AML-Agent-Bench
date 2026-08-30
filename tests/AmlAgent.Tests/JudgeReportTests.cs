@@ -133,6 +133,21 @@ public class JudgeReportTests
     }
 
     [SkippableFact]
+    public void EvidenceExtractionMethod_WhenMaterialClaimsPresent_IsOneOfTheTwoKnownConditions()
+    {
+        // v0.3 item 4: whichever condition produced this run's claim-level
+        // scoring must be recorded explicitly, not left implicit.
+        var p = ReportPath();
+        Skip.If(p is null, "no judge report");
+        var root = Report();
+        Skip.If(!root.TryGetProperty("material_claims", out var claims) || claims.ValueKind != JsonValueKind.Array || claims.GetArrayLength() == 0,
+            "no material_claims in this task's judge_report.json");
+
+        Assert.True(root.TryGetProperty("evidence_extraction_method", out var method), "missing field: evidence_extraction_method");
+        Assert.Contains(method.GetString(), new[] { "llm_mapped_from_narrative", "structured_output" });
+    }
+
+    [SkippableFact]
     public void MaterialClaims_WhenPresent_EveryEntryHasClaimIdAndAgentEvidenceArray()
     {
         // Fix #7: only meaningful for tasks whose evidence-annotations.json

@@ -162,6 +162,21 @@ internal static class JudgeAgent
         // claim_support_coverage stays null there exactly as before this fix.
         var materialClaims = LoadMaterialClaims(rubricPath, rubric);
 
+        // v0.3 validation-priorities item 4: the structured-citation-output
+        // experimental condition. If the agent produced claim_evidence.json
+        // (Condition B), its own declared claim-to-evidence mapping is used
+        // DIRECTLY below instead of asking the LLM judge to derive one from
+        // free-text prose (Condition A, the existing/default path) -- this
+        // removes the one non-deterministic step Claim Support Coverage
+        // still has under Condition A (see docs/evidence-traceability-framework.md
+        // #structured-citation-output-condition): under Condition B, claim-level
+        // scoring is deterministic end-to-end, not just "given the mapper's
+        // output". Detected here (not just at the merge site below) so the
+        // MATERIAL CLAIMS prompt section can be skipped entirely when it
+        // isn't needed -- one fewer thing asked of the LLM, not just one
+        // fewer thing used from its answer.
+        var structuredClaimEvidence = LoadStructuredClaimEvidenceIfPresent(workspace);
+
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? throw new InvalidOperationException("OPENAI_API_KEY is not set");
         var model = Environment.GetEnvironmentVariable("BENCH_JUDGE_MODEL")
@@ -208,8 +223,12 @@ internal static class JudgeAgent
         user.AppendLine(groundingBundle);
         user.AppendLine();
 
-        if (materialClaims.Count > 0)
+        if (materialClaims.Count > 0 && structuredClaimEvidence is null)
         {
+            // Only asked when the agent did NOT provide claim_evidence.json --
+            // when it did (Condition B), its own structured declarations are
+            // used directly at the merge site below, and asking the LLM to
+            // also do this from prose would be redundant, not just unused.
             user.AppendLine("MATERIAL CLAIMS TO ASSESS: for EACH of the following pre-defined claims, decide whether the candidate's report asserts it (even if worded differently), and if so, list every evidence id (transaction id, relationship id, watchlist id, etc.) the report cites in the text supporting that specific assertion. If the report does not make this assertion at all, or makes it without citing any evidence, return an empty array for that claim -- do not guess or invent a citation.");
             foreach (var c in materialClaims)
                 user.AppendLine($"- claim_id={c.ClaimId}: {c.Text}");
@@ -373,18 +392,42 @@ internal static class JudgeAgent
             ["valid_evidence_f1"] = traceability.ValidEvidenceF1,
         };
 
-        // --- Claim Support Coverage (fix #7) ---
+        // --- Claim Support Coverage (fix #7, extended by v0.3 item 4) ---
         // Merges each material-claim template (claim_id/text/reference evidence,
-        // authored in evidence-annotations.json) with the LLM's per-claim citation
-        // assessment above into real AmlAgent.Evidence.Claim objects, so
-        // ClaimLevelScoring can compute Claim Support Coverage deterministically
-        // (superset-of-Required-or-one-AcceptableAlternatives-set) once it reaches
-        // AssuranceProfileBuilder. A claim the LLM never returned an assessment for
-        // (missing from material_claim_assessments) is treated as zero evidence
-        // cited -- absence of an assessment must never be silently read as support.
+        // authored in evidence-annotations.json) with the claim-to-evidence
+        // mapping into real AmlAgent.Evidence.Claim objects, so ClaimLevelScoring
+        // can compute Claim Support Coverage deterministically once it reaches
+        // AssuranceProfileBuilder. The mapping's SOURCE depends on which
+        // condition this run is under:
+        //   - Condition B (structured output, claim_evidence.json present):
+        //     AgentEvidence comes directly from what the agent itself declared
+        //     -- no LLM step in the mapping at all, so CSC is deterministic
+        //     end-to-end, not just "given the mapper's output".
+        //   - Condition A (free narrative, the default/original path): the
+        //     LLM judge's material_claim_assessments, exactly as fix #7 built
+        //     it. A claim the LLM never returned an assessment for (missing
+        //     from material_claim_assessments) is treated as zero evidence
+        //     cited -- absence of an assessment must never be silently read
+        //     as support.
+        // Either way, the SAME task-defined claim_id scheme is used, so
+        // downstream scoring/comparison code never needs to know which
+        // condition produced a given AgentEvidence list.
         if (materialClaims.Count > 0)
         {
-            var assessments = ParseMaterialClaimAssessments(parsed["material_claim_assessments"]);
+            IReadOnlyDictionary<string, List<string>> assessments;
+            string extractionMethod;
+            if (structuredClaimEvidence is not null)
+            {
+                assessments = structuredClaimEvidence.Claims.ToDictionary(
+                    c => c.ClaimId, c => c.Evidence.Select(e => e.EvidenceId).ToList(), StringComparer.OrdinalIgnoreCase);
+                extractionMethod = "structured_output";
+            }
+            else
+            {
+                assessments = ParseMaterialClaimAssessments(parsed["material_claim_assessments"]);
+                extractionMethod = "llm_mapped_from_narrative";
+            }
+
             var claims = materialClaims.Select(c => new Claim(
                 ClaimId: c.ClaimId,
                 Text: c.Text,
@@ -393,6 +436,7 @@ internal static class JudgeAgent
                 ReferenceEvidence: c.ReferenceEvidence)).ToList();
 
             parsed["material_claims"] = ClaimJson.ToJsonArray(claims);
+            parsed["evidence_extraction_method"] = extractionMethod;
 
             var csc = ClaimLevelScoring.ComputeClaimSupportCoverage(claims);
             Console.WriteLine(csc is double c
@@ -563,6 +607,32 @@ internal static class JudgeAgent
             templates.Add(new MaterialClaimTemplate(claimId, text, new ReferenceEvidence(required, alternatives)));
         }
         return templates;
+    }
+
+    /// <summary>
+    /// v0.3 validation-priorities item 4: if the agent produced
+    /// workspace/claim_evidence.json (the structured-citation-output
+    /// experimental condition), parses and returns it. Returns null (never
+    /// throws) for any run without the file, or one that fails to parse --
+    /// this is an OPTIONAL agent output; a malformed one degrades to
+    /// Condition A (the LLM-mapped narrative path) with a loud warning,
+    /// rather than failing the whole judge run over an agent's formatting
+    /// mistake in an experimental, non-required file.
+    /// </summary>
+    private static StructuredClaimEvidenceSet? LoadStructuredClaimEvidenceIfPresent(string workspace)
+    {
+        var path = Path.Combine(workspace, "claim_evidence.json");
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            return StructuredClaimEvidenceReader.Parse(File.ReadAllText(path), path);
+        }
+        catch (InvalidStructuredClaimEvidenceException ex)
+        {
+            Console.Error.WriteLine($"[judge]   WARNING: {path} is present but invalid ({ex.Message}) -- falling back to Condition A (LLM-mapped narrative)");
+            return null;
+        }
     }
 
     /// <summary>

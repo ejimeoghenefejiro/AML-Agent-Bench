@@ -51,6 +51,27 @@ A compliance-style markdown report covering:
 5. **Data quality / audit trail** — summarise anything `case_manifest.json` flagged (merge conflicts, evidence-integrity issues) and how you handled it.
 6. **Typology and facts vs. assumptions** — name the fraud typology and clearly separate what the data shows from what it might mean. Use cautious, regulator-appropriate language; do not assert criminal conclusions.
 
+### 3. `claim_evidence.json` (optional, structured citation output)
+
+You may **additionally** produce a structured version of the evidence you cite for the six investigative questions your report already covers above. This does not replace `mule_network_report.md` — it is an optional, explicit restatement of the same citations in a machine-readable shape, for exactly the claims your report is already required to make:
+
+```json
+{
+  "schema_version": "1.0",
+  "claims": [
+    { "claim_id": "MC1", "text": "<your own wording of who the victim is>",
+      "evidence": [ { "evidence_id": "T1-001", "evidence_type": "transaction" } ] },
+    { "claim_id": "MC2", "text": "<your own wording of the first-layer mule accounts>", "evidence": [ ... ] },
+    { "claim_id": "MC3", "text": "<your own wording of the aggregator account>", "evidence": [ ... ] },
+    { "claim_id": "MC4", "text": "<your own wording of any watchlist corroboration>", "evidence": [ ... ] },
+    { "claim_id": "MC5", "text": "<your own wording of the exit point>", "evidence": [ ... ] },
+    { "claim_id": "MC6", "text": "<your own wording of your assessment of N150>", "evidence": [ ... ] }
+  ]
+}
+```
+
+`claim_id` values MC1–MC6 correspond to the six things section 2 (`claim_id`s MC1–MC3, MC5), section 3 (MC4), and section 4's assessment of N150 (MC6) already ask you to cover in prose — this file is not asking for anything new, only for the same content in a structured form. `evidence` may be empty for a claim you did not find support for. `evidence_id` values must exist in `data/transactions.csv` or `data/relationships.json`, same as any other citation. `evidence_type` is optional and purely descriptive.
+
 ## Constraints
 
 - Every transaction ID, account ID, amount, or timestamp you cite must exist in `data/transactions.csv` or `data/relationships.json`.
