@@ -7,9 +7,13 @@ namespace AmlAgent.Evidence;
 /// instructions: "do not automatically claim validity from a single statistic".
 /// A percentage agreement rate is included as a descriptive convenience on each
 /// result record, not as a reliability/validity claim (it is not Cohen's Kappa
-/// or any chance-corrected statistic -- deliberately not computed here, since
-/// that would be exactly the kind of premature validity claim this item warns
-/// against).
+/// or any chance-corrected statistic). Chance-corrected agreement (Cohen's
+/// kappa, Fleiss' kappa) is deliberately kept in a separate class,
+/// AmlAgent.Evidence.AgreementStatistics (v0.3 validation-priorities item 1,
+/// built once a real annotation round became the actual next step rather
+/// than a hypothetical one) -- callers who need it call that directly on the
+/// raw per-claim label lists, rather than this class computing it implicitly
+/// as a side effect of a raw-agreement comparison.
 /// </summary>
 public static class JudgeVsHumanComparison
 {
@@ -116,12 +120,29 @@ public sealed record ClassificationAgreement(
     public double? AgreementRate => ComparedClaimCount == 0 ? null : (double)AgreeCount / ComparedClaimCount;
 }
 
+/// <summary>
+/// Precision/Recall here answer the v0.3 validation-priorities question this
+/// type exists for: how well does the JUDGE'S claim-to-evidence mapping (the
+/// LLM step CSC's own citation-identification depends on -- see
+/// docs/evidence-traceability-framework.md#claim-support-coverage-csc's
+/// "deterministic given the mapper output" boundary) match a human's
+/// independent labelling of the same reports/claims. Precision = of the
+/// evidence ids the judge/mapper cited, how many a human also cited for that
+/// claim; Recall = of the evidence ids a human cited, how many the judge/
+/// mapper found too. Both null (not zero) when their denominator is zero --
+/// e.g. Precision is null if the judge cited nothing for any compared claim,
+/// not automatically 0 or 1.
+/// </summary>
 public sealed record EvidenceLinkAgreement(
     int ComparedClaimCount,
     int TotalJudgeEvidenceIds,
     int TotalHumanEvidenceIds,
     int TotalOverlap,
-    IReadOnlyList<EvidenceLinkClaimComparison> PerClaim);
+    IReadOnlyList<EvidenceLinkClaimComparison> PerClaim)
+{
+    public double? Precision => TotalJudgeEvidenceIds == 0 ? null : Math.Round((double)TotalOverlap / TotalJudgeEvidenceIds, 4);
+    public double? Recall => TotalHumanEvidenceIds == 0 ? null : Math.Round((double)TotalOverlap / TotalHumanEvidenceIds, 4);
+}
 
 public sealed record EvidenceLinkClaimComparison(string ClaimId, IReadOnlyList<string> JudgeOnly, IReadOnlyList<string> HumanOnly, IReadOnlyList<string> Overlap);
 

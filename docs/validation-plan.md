@@ -30,13 +30,19 @@ This existing test suite is feasibility/construct-validity evidence for a resear
 
 Compare benchmark traceability scores with independent human judgements of evidence quality/traceability. **Not yet performed** — requires real human annotations (see [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md)), which do not exist yet. The comparison tooling to run this once annotations exist is already built and tested against synthetic fixtures (`JudgeVsHumanComparison`, `tests/AmlAgent.ResearchValidation/HumanAnnotationTests.cs`).
 
+## LLM claim-to-evidence mapper validity
+
+**New subsection (v0.3 validation-priorities item 2).** Claim Support Coverage (fix #7) has a boundary that must be validated in its own right, distinct from convergent validity above: reference evidence and adequacy rules for task-007's `material_claims` are task-authored, and `ClaimLevelScoring.IsSupported` scores adequacy deterministically — but the LLM judge still performs one non-deterministic step, identifying *which evidence ids the report cites for each claim* (`JudgeAgent.cs`'s material-claim-assessment prompt). CSC is therefore **deterministic given the mapper's output**, not end-to-end deterministic — see [docs/evidence-traceability-framework.md#claim-support-coverage-csc](evidence-traceability-framework.md#claim-support-coverage-csc). That mapping step is exactly what this subsection validates, separately from whether the reference-evidence rules themselves are agreed by independent human annotators (Convergent validity, Inter-rater reliability, above/below).
+
+**Not yet performed** — requires a human-labelled set of (report, claim, cited-evidence-ids) triples to compare the mapper's output against, which does not exist yet (the same annotation-collection dependency every "not yet performed" item on this page has). The comparison tooling is built and tested: `JudgeVsHumanComparison.CompareEvidenceLinks` now exposes `Precision`/`Recall` directly (of the evidence ids the mapper cited for a claim, how many a human also cited; of the ids a human cited, how many the mapper found) — see `tests/AmlAgent.ResearchValidation/HumanAnnotationTests.cs`'s `CompareEvidenceLinks_ExposesPrecisionAndRecallOfTheMapper`, checked against a hand-computed synthetic example, never real data. The concrete next step: run the live judge against a small set of real task-007 candidate reports, have an independent human label which evidence ids they'd cite for each material claim (using `AmlAgent.Evidence.HumanAnnotation`'s existing schema — `EvidenceIds` per claim already carries exactly this), and compare via `CompareEvidenceLinks`.
+
 ## Discriminant validity
 
 Demonstrate that evidence traceability is not redundant with conventional task performance. The current preliminary result — a holistic rubric passing while traceability recall is very low (see `docs/preliminary-results.md`) — is useful feasibility evidence that the two can diverge, **but it is one run against one task and must not be described as conclusive validation**. A proper discriminant-validity claim requires the repeated-run and cross-model/cross-task experiments described in [docs/experimental-design.md](experimental-design.md).
 
 ## Inter-rater reliability
 
-Whether gold annotations are reproducible across annotators. **Not yet performed** — no multi-annotator data exists yet. Evidence for this, once collected, would be agreement statistics and adjudication analysis (Cohen's kappa for two categorical raters, Krippendorff's alpha for more flexible multi-rater settings — see [docs/evidence-annotation-protocol.md](evidence-annotation-protocol.md#multi-annotator-validation)). `JudgeVsHumanComparison.CompareAnnotators` (tested against a synthetic fixture in `tests/AmlAgent.ResearchValidation/HumanAnnotationTests.cs`) is the tooling ready to compute raw agreement once real multi-annotator data exists — deliberately not a chance-corrected statistic yet, since that would be premature against synthetic data.
+Whether gold annotations are reproducible across annotators. **Not yet performed** — no multi-annotator data exists yet. The full infrastructure to compute this once real data exists is now built (v0.3 items 1/2, see [docs/evidence-annotation-protocol.md#multi-annotator-validation](evidence-annotation-protocol.md#multi-annotator-validation)): raw agreement (`JudgeVsHumanComparison.CompareAnnotators`, `ClaimAnnotationAdjudication.Compare`) and chance-corrected agreement (`AgreementStatistics.ComputeCohensKappa` for two raters, `ComputeFleissKappa` for three or more, both checked against hand-computed textbook examples in `tests/AmlAgent.Tests/AgreementStatisticsTests.cs`). Krippendorff's alpha (for uneven rater coverage per item) remains genuinely not implemented, pending a real pilot's actual data shape. None of this tooling has been run against real annotation data, and none of it should be read as evidence that inter-rater reliability has been established — it is the arithmetic a real round needs, built ahead of the round itself.
 
 ## Test-retest reliability
 
@@ -53,7 +59,17 @@ Investigate:
 
 ## Sensitivity
 
-Whether the benchmark can distinguish known, graded levels of traceability degradation — not just detect *that* something is wrong, but track *how much*. Proposed test: synthetic perturbation ladders with graded evidence corruption (e.g. 0%, 25%, 50%, 100% of gold citations deleted; 0, 1, 3, 5 fabricated ids injected) and verify the relevant metric degrades monotonically. Partial evidence exists today at the qualitative level (`EvidenceCorruptionSensitivityTests.cs` shows individual corruptions ARE or ARE NOT detected — a binary, not a graded, result); a genuine graded-ladder sensitivity study has **not yet been built**.
+Whether the benchmark can distinguish known, graded levels of traceability degradation — not just detect *that* something is wrong, but track *how much*. **Built (v0.3 item 8):** `tests/AmlAgent.Tests/SensitivityLadderTests.cs` implements five graded perturbation ladders and asserts the relevant metric moves monotonically at every step, not just between two endpoints:
+
+| Ladder | Perturbation | Metric checked | Direction |
+|---|---|---|---|
+| Gold evidence omission | 0/25/50/75/100% of gold citations dropped | Recall | strictly decreasing |
+| Invalid references | 0, 1, 3, 5 fabricated ids injected (same-shape fabrication, exercising fix #3's generic detection, not just transaction-shaped ids) | Reference validity rate, standard precision | both decreasing; `valid_evidence_precision` (fix #4) checked flat, as designed |
+| Distractor evidence volume | 0/1/2/3/4 irrelevant-but-real citations added | Precision | decreasing; recall checked unaffected |
+| Unsupported material claims | 0/25/50/75/100% of material claims left unsupported | Claim Support Coverage | strictly decreasing |
+| Incomplete multi-hop evidence | 4/3/2/1/0 of 4 required hops cited | Claim-level recall (graded) vs. `Supported` (binary) | recall decreases gradually; `Supported` flips to false the moment even one hop is missing, deliberately not tracking recall's gradual decline |
+
+Every expected value was hand-computed before running the test (not tuned to match whatever the code happened to produce), and all five passed on first run — a genuine, checked finding that these metrics behave as construct validity requires, not just an assertion that the code executes. `EvidenceCorruptionSensitivityTests.cs` (binary detected/not-detected per corruption type) remains complementary, not superseded.
 
 ## External validity
 

@@ -26,6 +26,7 @@
     "The case has a genuine cross-source merge conflict: the correspondent feed and the archive disagree on T2-001's timestamp (2026-02-02 vs 2026-02-05, a 3-day settlement-date discrepancy) -- a strong report notes this rather than silently picking one value."
   ],
   "material_claims_note": "Fix #7: formalises the six network/typology conclusions above (excluding the merge-conflict one, which isn't an evidence-id-shaped claim -- it's about case_manifest.json content, already covered by the audit_trail_awareness rubric dimension) into scoreable claims with Required/AcceptableAlternatives reference evidence. Each pairs a transaction-id path with the equivalent relationship-graph path as an acceptable alternative, since either citation independently establishes the same fact. The judge is asked, for each claim, which of these evidence ids the candidate's report actually cites in support of it -- that per-claim citation list becomes agent_evidence, scored deterministically against required/acceptable_alternatives by AmlAgent.Evidence.ClaimLevelScoring (no further LLM judgement involved in the scoring itself, only in identifying which ids the report cites for which claim).",
+  "material_claims_schema_version": "1.0",
   "material_claims": [
     {
       "claim_id": "MC1",

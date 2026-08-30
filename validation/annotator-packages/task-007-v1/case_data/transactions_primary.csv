@@ -1,0 +1,6 @@
+transaction_id,source_account,destination_account,amount,currency,timestamp,channel,jurisdiction,sar_linked
+T1-001,N100,M201,15000.00,GBP,2026-02-02T09:00:00Z,faster_payment,GB,false
+T1-002,N100,M202,12000.00,GBP,2026-02-02T09:15:00Z,faster_payment,GB,false
+T1-003,M201,M301,14800.00,GBP,2026-02-02T10:00:00Z,faster_payment,GB,true
+T1-004,M202,M301,11900.00,GBP,2026-02-02T10:15:00Z,faster_payment,GB,true
+T1-005,N150,M201,850.00,GBP,2026-01-30T14:00:00Z,standing_order,GB,false

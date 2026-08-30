@@ -1,0 +1,17 @@
+{
+  "_instructions": "Read INSTRUCTIONS.md first. Fill in annotator_id below with your own identifier/pseudonym. Replace the single example claim with as many claims as you independently identify -- do not treat the example as a hint about the real number or content of material claims in this case. Delete this _instructions field before submitting (it is not part of the schema AmlAgent.Evidence.GoldClaimAnnotationReader parses).",
+  "schema_version": "1.0",
+  "task_id": "task-007-multi-source-mule-network",
+  "annotator_id": "REPLACE_WITH_YOUR_ANNOTATOR_ID",
+  "adjudication_status": "draft",
+  "claims": [
+    {
+      "claim_id": "MC1",
+      "text": "EXAMPLE ONLY -- replace with your own claim text.",
+      "required": ["EXAMPLE_EVIDENCE_ID"],
+      "acceptable_alternatives": [["ALTERNATIVE_EVIDENCE_ID_1", "ALTERNATIVE_EVIDENCE_ID_2"]],
+      "corroborating": [],
+      "rationale": "EXAMPLE ONLY -- explain why this evidence is required/acceptable for this claim."
+    }
+  ]
+}

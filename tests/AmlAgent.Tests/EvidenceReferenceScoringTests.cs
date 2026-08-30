@@ -153,6 +153,103 @@ public class EvidenceReferenceScoringTests
         Assert.Equal(r1.GroundedCitations, r2.GroundedCitations);
     }
 
+    // -- Fix #3 (v0.3): generic fabricated-evidence detection beyond transaction shapes --
+
+    [Fact]
+    public void InferEvidenceIdShapes_GeneralisesFromRealIdsWithDigits()
+    {
+        var known = new[] { Rel("R1"), Rel("R2"), Watchlist("WATCHLIST1"), Sar("SAR-2026-001") };
+        var shapes = EvidenceScoring.InferEvidenceIdShapes(known);
+
+        Assert.Contains(shapes, s => s.IsMatch("R99"));
+        Assert.Contains(shapes, s => s.IsMatch("WATCHLIST7"));
+        Assert.Contains(shapes, s => s.IsMatch("SAR-2027-042"));
+    }
+
+    [Fact]
+    public void InferEvidenceIdShapes_IdWithNoDigits_ProducesNoShape()
+    {
+        var known = new[] { Rel("VICTIM") };
+        var shapes = EvidenceScoring.InferEvidenceIdShapes(known);
+        Assert.DoesNotContain(shapes, s => s.IsMatch("VICTIM2")); // no digit run to generalise from
+    }
+
+    [Fact]
+    public void ExtractShapeFabricatedIds_FabricatedRelationshipId_Recognised()
+    {
+        // R99 was never real, but the case has real R1..R7 -- the shape "R\d+"
+        // is inferred from those and R99 matches it, so it's caught as a
+        // plausible fabrication instead of being silently invisible.
+        var known = new[] { Rel("R1"), Rel("R2"), Rel("R7") };
+        var fabricated = EvidenceScoring.ExtractShapeFabricatedIds("Corroborated by relationship R99.", known);
+        Assert.Contains("R99", fabricated);
+    }
+
+    [Fact]
+    public void ExtractShapeFabricatedIds_FabricatedWatchlistId_Recognised()
+    {
+        var known = new[] { Watchlist("WATCHLIST1") };
+        var fabricated = EvidenceScoring.ExtractShapeFabricatedIds("Flagged per WATCHLIST9.", known);
+        Assert.Contains("WATCHLIST9", fabricated);
+    }
+
+    [Fact]
+    public void ExtractShapeFabricatedIds_RealId_NotFlaggedAsFabricated()
+    {
+        var known = new[] { Rel("R1") };
+        var fabricated = EvidenceScoring.ExtractShapeFabricatedIds("See R1.", known);
+        Assert.DoesNotContain("R1", fabricated);
+    }
+
+    [Fact]
+    public void ExtractShapeFabricatedIds_TransactionShapedToken_ExcludedToAvoidDoubleCounting()
+    {
+        // A transaction-shaped fabrication is the legacy regex's job (fix #1);
+        // this method must not also report it, or ComputeTraceability would
+        // count one text occurrence twice.
+        var known = new[] { Rel("R1") };
+        var fabricated = EvidenceScoring.ExtractShapeFabricatedIds("See T3-999.", known);
+        Assert.DoesNotContain("T3-999", fabricated);
+    }
+
+    [Fact]
+    public void ComputeTraceability_FabricatedRelationshipId_NowCaughtAsFabricated()
+    {
+        // The gap fix #1's own doc comment used to flag as "still open":
+        // a fabricated relationship id is now caught, not just fabricated
+        // transaction ids.
+        var valid = new[] { Rel("R1"), Rel("R2"), Txn("T1-001") };
+        var gold = new[] { Rel("R1") };
+        var result = EvidenceScoring.ComputeTraceability("R1 confirms this, corroborated by R99.", valid, gold);
+
+        Assert.Contains("R99", result.FabricatedCitations);
+        Assert.Equal(1, result.GroundedDistinct); // only R1
+    }
+
+    [Fact]
+    public void ComputeTraceability_RealAndFabricatedOfSameType_NoDoubleCountingInCitedTotal()
+    {
+        var valid = new[] { Rel("R1"), Rel("R2") };
+        var result = EvidenceScoring.ComputeTraceability("R1 is real, R99 is not.", valid, valid);
+
+        // One mention each -> CitedTotal must be exactly 2, not inflated by
+        // any overlap between the known-id pass and the shape-fabrication pass.
+        Assert.Equal(2, result.CitedTotal);
+        Assert.Equal(2, result.CitedDistinct);
+    }
+
+    [Fact]
+    public void ComputeTraceability_NoRealExamplesOfAType_CannotInferShapeForThatType()
+    {
+        // Honest limitation, not a bug: with no real SAR ids anywhere in
+        // validEvidence, there's nothing to generalise a SAR shape from, so a
+        // fabricated-looking SAR id is invisible -- exactly like any other
+        // evidence type with zero real examples in the case.
+        var valid = new[] { Rel("R1") };
+        var result = EvidenceScoring.ComputeTraceability("See SAR-2099-999.", valid, valid);
+        Assert.DoesNotContain("SAR-2099-999", result.FabricatedCitations);
+    }
+
     [Fact]
     public void ComputeTraceability_MatchesLegacyOverload_ForTransactionOnlyInputs()
     {

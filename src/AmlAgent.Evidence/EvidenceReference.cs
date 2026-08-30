@@ -12,8 +12,10 @@ namespace AmlAgent.Evidence;
 /// watchlist entry, a SAR filing, a KYC record -- recognisable to the
 /// traceability scorer at all. Previously only transaction-ID-shaped tokens
 /// (matching a fixed regex) were ever extracted from report text; a report
-/// correctly citing a relationship id like "R1" got zero credit and a report
-/// fabricating one went completely undetected. See
+/// correctly citing a relationship id like "R1" got zero credit (fixed by
+/// EvidenceScoring.ExtractCitedEvidenceIds) and a report fabricating one went
+/// completely undetected (fixed by EvidenceScoring.InferEvidenceIdShapes /
+/// ExtractShapeFabricatedIds, v0.3 validation-priorities fix #3). See
 /// docs/evidence-traceability-framework.md#traceability-failure-taxonomy for
 /// the gap this closes, and EvidenceScoring.ExtractCitedEvidenceIds /
 /// EvidenceScoring.ComputeTraceability(string, IReadOnlyCollection&lt;EvidenceReference&gt;, ...)

@@ -17,10 +17,11 @@ namespace AmlAgent.ResearchValidation;
 /// (incorrect_conclusion_plausible_explanation, and for task-007 also
 /// over/under-reporting entities) cannot be discriminated by EGHR/traceability
 /// alone -- this is demonstrated explicitly, not hidden, per each fixture's
-/// "flag" field. aml-transaction-network (the third existing task) has no
-/// rubric.json/gold-evidence-annotations at all, so it is not feasible to run
-/// this experiment against it; task-006 and task-007 are the two tasks where
-/// this is feasible.
+/// "flag" field. aml-transaction-network has no rubric.json/gold-evidence-
+/// annotations at all, so it is not feasible to run this experiment against
+/// it. task-008 (added v0.3 item 6) also has a rubric.json/evidence-
+/// annotations.json and could take this same fixture treatment -- not yet
+/// done, a genuine next step, not claimed as covered here.
 /// </summary>
 public class DiscriminationValidationTests
 {
@@ -256,7 +257,7 @@ public class DiscriminationValidationTests
     }
 
     [Fact]
-    public void AllTenRequiredCategoriesArePresent_Task007()
+    public void AllElevenRequiredCategoriesArePresent_Task007()
     {
         var categories = Directory.GetFiles(Path.Combine(RootDir, "task-007"), "*.json").Where(f => !Path.GetFileName(f).StartsWith('_'))
             .Select(f => (string)JsonNode.Parse(File.ReadAllText(f))!["category"]!)
@@ -269,13 +270,14 @@ public class DiscriminationValidationTests
             "unsupported_claim_hallucination", "missing_important_gold_evidence",
             "over_reporting_innocent_entities", "under_reporting_suspicious_entities",
             "correct_outcome_poor_traceability", "incorrect_outcome_excellent_traceability",
+            "incorrect_outcome_poor_traceability",
         };
         foreach (var r in required) Assert.Contains(r, categories);
-        Assert.Equal(10, categories.Count);
+        Assert.Equal(11, categories.Count);
     }
 
     [Fact]
-    public void SevenApplicableCategoriesArePresent_Task006()
+    public void EightApplicableCategoriesArePresent_Task006()
     {
         // over/under-reporting entities do not apply to task-006's output shape
         // (a temporal CSV summary + narrative report, no entity classification) --
@@ -289,10 +291,10 @@ public class DiscriminationValidationTests
             "correct_answer_correct_evidence", "correct_conclusion_incomplete_evidence",
             "correct_conclusion_fabricated_citation", "incorrect_conclusion_plausible_explanation",
             "unsupported_claim_hallucination", "missing_important_gold_evidence",
-            "correct_conclusion_poor_traceability",
+            "correct_conclusion_poor_traceability", "incorrect_conclusion_poor_traceability",
         };
         foreach (var r in required) Assert.Contains(r, categories);
-        Assert.Equal(7, categories.Count);
+        Assert.Equal(8, categories.Count);
     }
 
     // -- Fix #9: discriminant-validity fixture families, made explicit --
@@ -390,5 +392,54 @@ public class DiscriminationValidationTests
         Assert.False(outcomeCorrect2, "family 2 fixture's outcome should be incorrect");
         Assert.True(correctPoorTrace.Trace.F1 < incorrectGoodTrace.Trace.F1,
             "traceability should move in the OPPOSITE direction from outcome correctness across these two fixtures");
+    }
+
+    // -- v0.3 item 7: the four-quadrant matrix, made formal, not just implicit
+    // through separate pairwise fixture comparisons above. --
+
+    private static bool OutcomeIsCorrect(Fixture f)
+    {
+        if (f.Raw["findings"] is not JsonArray findings) return false;
+        var (fp, fn) = ClassifyFindings(findings);
+        return fp.Count == 0 && fn.Count == 0;
+    }
+
+    [Fact]
+    public void FourQuadrantMatrix_Task007_AllFourCellsExistAndAreCorrectlyPositioned()
+    {
+        // The formal 2x2 outcome-correctness x traceability matrix the v0.3
+        // validation-priorities doc asks for explicitly:
+        //   Cell A (high/high): 01_correct_answer_correct_evidence
+        //   Cell B (high/low):  09_correct_outcome_poor_traceability
+        //   Cell C (low/high):  10_incorrect_outcome_excellent_traceability
+        //   Cell D (low/low):   11_incorrect_outcome_poor_traceability
+        // "High" traceability here means F1 tied with the perfect fixture;
+        // "low" means strictly below it -- the same operational definitions
+        // fix #9's pairwise tests already used, now asserted as one matrix.
+        var fixtures = LoadTask("task-007");
+        var cellA = fixtures["correct_answer_correct_evidence"];
+        var cellB = fixtures["correct_outcome_poor_traceability"];
+        var cellC = fixtures["incorrect_outcome_excellent_traceability"];
+        var cellD = fixtures["incorrect_outcome_poor_traceability"];
+
+        var matrix = new[]
+        {
+            (Cell: "A (high outcome, high traceability)", ExpectOutcome: true, ExpectHighTrace: true, Fixture: cellA),
+            (Cell: "B (high outcome, low traceability)", ExpectOutcome: true, ExpectHighTrace: false, Fixture: cellB),
+            (Cell: "C (low outcome, high traceability)", ExpectOutcome: false, ExpectHighTrace: true, Fixture: cellC),
+            (Cell: "D (low outcome, low traceability)", ExpectOutcome: false, ExpectHighTrace: false, Fixture: cellD),
+        };
+
+        foreach (var (cell, expectOutcome, expectHighTrace, fixture) in matrix)
+        {
+            Assert.True(OutcomeIsCorrect(fixture) == expectOutcome, $"[{cell}] outcome correctness mismatch");
+            bool actuallyHighTrace = fixture.Trace.F1 == cellA.Trace.F1;
+            Assert.True(actuallyHighTrace == expectHighTrace, $"[{cell}] traceability mismatch (F1={fixture.Trace.F1}, perfect F1={cellA.Trace.F1})");
+        }
+
+        // Every cell is non-empty and distinct from every other -- the matrix
+        // has four genuinely different fixtures, not the same one relabelled.
+        var distinctCategories = matrix.Select(m => m.Fixture.Category).Distinct().Count();
+        Assert.Equal(4, distinctCategories);
     }
 }

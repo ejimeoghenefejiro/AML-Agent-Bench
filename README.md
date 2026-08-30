@@ -57,13 +57,13 @@
 
 **Evidence traceability is the sole primary doctoral construct.** Task performance is measured as a baseline, and reproducibility, auditability, human review, and governance are supporting properties assessed through the same harness — not separate deep studies competing for primacy. See [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md) for the formal definition and [docs/research-problem.md](docs/research-problem.md) for the full motivation and research gap.
 
-Concretely, today's three tasks test whether an agent can:
+Concretely, today's four tasks test whether an agent can:
 
 - read structured transaction data and build a **directed weighted transaction graph**
 - identify connected account clusters and circular flows
 - detect **temporal change** in a transaction network (week-over-week, not just static)
 - compute composite **risk scores** under explicit rules
-- **cite evidence by transaction ID** when writing about suspicious activity
+- **cite specific case evidence using resolvable evidence identifiers** (transaction IDs, relationship/watchlist IDs, and other canonical record types — see [Evidence node, realised](docs/evidence-traceability-framework.md#evidence-node-realised-evidencereference)) when writing about suspicious activity
 - **separate observed facts from analytical assumptions**
 - use **regulator-friendly, compliance-aware language**
 - **ground every claim in real, existing evidence** — no fabricated transactions, accounts, or amounts (see the [traceability failure taxonomy](docs/evidence-traceability-framework.md#traceability-failure-taxonomy)'s `invalid_reference`/`unsupported_claim`, which replace "hallucination" as this benchmark's organising vocabulary — see [Legacy: the EGHR metric](docs/evidence-traceability-framework.md#legacy-eghr-metric) for why that older term is still kept alive in code, not in framing)
@@ -100,7 +100,7 @@ See [docs/research-problem.md](docs/research-problem.md) for the longer write-up
 | **LLM-as-judge** | `agents/csharp-sk/Agent/JudgeAgent.cs` | The same SK core grades qualitative regulatory properties against a `rubric.json`, and computes EGHR + evidence traceability |
 | **Evidence scoring** | `src/AmlAgent.Evidence/` | Pure, unit-tested logic for evidence-traceability citation precision/recall (primary) and the legacy EGHR claim-support check (secondary) |
 | **Data adapters** | `src/AmlAgent.Adapters/` | Multi-format/multi-source case loading (CSV/JSON/Parquet/GraphML/SQL Server/PostgreSQL/Neo4j), merge, and evidence-integrity validation into one canonical case |
-| **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort assertions across all three tasks; citation/judge-report assertions across the two tasks (task-006, task-007) that have a `rubric.json` and a live judge |
+| **Tests** | `tests/AmlAgent.Tests/` (xUnit) | Deterministic schema / range / sort assertions across all four tasks; citation/judge-report assertions across the three tasks (task-006, task-007, task-008) that have a `rubric.json` and a live judge |
 | **Tasks** | `tasks/<task-id>/` | Self-contained task definitions: brief + data + expected behaviour + tests + rubric |
 | **Submissions** | `submissions/` (mostly gitignored) | Drop point for external agents; ships with one reference Python baseline |
 | **Run results** | `results/` (gitignored JSONs, tracked README) | One `bench_result.json` per run, ready for cross-run aggregation |
@@ -395,7 +395,7 @@ See [submissions/README.md](submissions/README.md) for the full submission contr
 - Level-3 task in the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy): the agent must establish a relational fraud pattern (mule network) spanning multiple sources, not just cite individual transactions.
 - See `tasks/task-007-multi-source-mule-network/`: [prompt.md](tasks/task-007-multi-source-mule-network/prompt.md), [expected-behaviour.md](tasks/task-007-multi-source-mule-network/expected-behaviour.md), [rubric.json](tasks/task-007-multi-source-mule-network/rubric.json).
 
-More tasks can be added by creating a new `tasks/<id>/` folder with the same files. These three tasks cover levels 1, 3 and 4 of the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy) (direct evidence retrieval, network reasoning, temporal reasoning); a standalone multi-record-aggregation task (level 2), case synthesis (level 5), and ambiguous/adversarial evidence (level 6) are planned.
+More tasks can be added by creating a new `tasks/<id>/` folder with the same files. These four tasks cover levels 1, 2, 3 and 4 of the [task complexity taxonomy](docs/research-problem.md#task-complexity-taxonomy) (direct evidence retrieval, multi-record aggregation, network reasoning, temporal reasoning) — task-008 (structuring below a reporting threshold) fills level 2, closing the gap the v0.3 validation-priorities pass flagged; case synthesis (level 5) and ambiguous/adversarial evidence (level 6) remain planned.
 
 **See [docs/preliminary-results.md](docs/preliminary-results.md) for first real cross-model, cross-language, and repeated-run results.**
 
@@ -450,7 +450,7 @@ The overall percentage and verdict are **recomputed defensively in C#** from the
 Alongside the task's own rubric dimensions, `judge_report.json` also carries the benchmark's evidence-traceability measures, computed by `src/AmlAgent.Evidence/EvidenceScoring.cs`. See [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md) for the formal model these implement.
 
 - **`evidence_traceability`** — citation precision/recall/F1, the PhD's primary metric. Computed **entirely deterministically** (regex citation extraction + set arithmetic, no LLM call), against a curated gold-evidence set per task (`tasks/<id>/evidence-annotations.json`). `precision`/`f1` use the standard IR definition — a fabricated citation counts against the denominator, so fabricating evidence measurably lowers precision. `valid_evidence_precision`/`valid_evidence_f1` report the same numerator over grounded (real) citations only, so they're deliberately blind to fabrication — see [docs/evidence-traceability-framework.md#evidence-precision-ep](docs/evidence-traceability-framework.md#evidence-precision-ep) for why both are reported rather than picking one silently.
-- **`eghr`** — Evidence-Grounded Hallucination Rate, retained as a **legacy/secondary** metric (see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md#legacy-eghr-metric) for why it's kept rather than removed). The judge extracts atomic claims from the candidate's report and labels each `supported` / `unsupported` / `contradicted`. Any claim citing a transaction ID that doesn't exist in the source data is **deterministically forced to `unsupported`**, regardless of what the LLM said — the judge cannot inflate its own grounding. `rate = (unsupported + contradicted) / total_claims`.
+- **`eghr`** — Evidence-Grounded Hallucination Rate, retained as a **legacy/secondary** metric (see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md#legacy-eghr-metric) for why it's kept rather than removed). The judge extracts atomic claims from the candidate's report and labels each `supported` / `unsupported` / `contradicted`. Any claim citing an evidence ID (a transaction ID for every task; for multi-source tasks with a `case-definition.json`, any canonical evidence type — see [Evidence node, realised](docs/evidence-traceability-framework.md#evidence-node-realised-evidencereference)) that doesn't exist in the source data is **deterministically forced to `unsupported`**, regardless of what the LLM said — the judge cannot inflate its own grounding. `rate = (unsupported + contradicted) / total_claims`.
 
 **Grounding data format:** `EvidenceScoring.ParseTxnIdsFromFile` dispatches by file extension, so a task's `grounding_inputs` (in `rubric.json`) can be **CSV or JSON** — `ParseTxnIdsFromJson` accepts a top-level array of objects, or an object wrapping that array under `transactions`/`rows`/`data`/`transfers`/`records`. Task 006 actually lists both `weekly_transfers.csv` and `weekly_transfers.json` (identical data, two representations) to prove the two formats produce identical valid-ID sets in a live run, not just in unit tests. An unrecognised extension (e.g. `.xlsx`) contributes no IDs rather than throwing — genuine spreadsheet support would need a parser dependency and isn't implemented.
 
@@ -640,7 +640,7 @@ AML-Agent-Bench/
 - **Agent core is Semantic Kernel.** Tools are exposed as `KernelFunction`s; the LLM drives an auto function-calling loop until it emits `DONE`. The agent never has direct access to the test code or the rubric.
 - **Two evaluators with the right ordering.** Judge runs first so its JSON is on disk; xUnit then asserts on both the agent's outputs **and** the judge report. Either failing produces `OVERALL: FAIL`.
 - **C# does the arithmetic.** The judge LLM produces per-dimension scores; the harness recomputes the overall percentage and verdict in C#, so the LLM cannot inflate its own pass rate.
-- **The judge is grounded.** The judge prompt includes the task's underlying data so the LLM can verify cited transaction IDs really exist.
+- **The judge is grounded.** The judge prompt includes the task's underlying data so the LLM can verify cited evidence (transaction IDs, and for multi-source tasks, relationship/watchlist/other canonical evidence IDs too) really exists.
 - **Workspace isolation.** Each run creates a fresh temp workspace; no two runs share state.
 - **Local mode parity.** `--local` runs the C# agent on the host via `dotnet run` and runs the same evaluators against the same workspace shape — useful when Docker isn't available.
 - **Polyglot harness.** The harness only requires a Docker image that reads `instruction.md` and writes output files — the agent language doesn't matter. The bundled Python baseline proves this on every Docker-mode run.
@@ -810,7 +810,7 @@ Stated plainly, not to be discovered by reading the code:
 
 - The current gold evidence set is small and single-author (no independent or multi-annotator validation yet — see [docs/evidence-annotation-protocol.md](docs/evidence-annotation-protocol.md)).
 - Claim-support coverage is live for task-007 only (single-author `material_claims` annotation, no multi-annotator validation); task-006 has none. Claim-level evidence sufficiency has an annotation schema and fixtures but no scoring implementation, deliberately, pending a real validated annotation round (see [docs/evidence-traceability-framework.md](docs/evidence-traceability-framework.md)).
-- The task set is small (three tasks across three complexity levels; see [docs/research-problem.md](docs/research-problem.md#task-complexity-taxonomy)).
+- The task set is small (four tasks across four complexity levels; see [docs/research-problem.md](docs/research-problem.md#task-complexity-taxonomy)).
 - Current preliminary results (`docs/preliminary-results.md`) are single-run, single-model/task data points, not a controlled study.
 - LLM-based semantic judgement (the judge's claim-support labels) is not yet validated against human raters.
 - Reproducibility of model output is inherently limited by provider-side non-determinism — see the real, measured run-to-run and judge-repeatability variance in `docs/preliminary-results.md`.

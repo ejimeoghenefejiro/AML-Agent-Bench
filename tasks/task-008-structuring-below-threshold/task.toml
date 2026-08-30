@@ -1,0 +1,16 @@
+id = "task-008-structuring-below-threshold"
+name = "Structuring Below Reporting Threshold"
+difficulty = "medium"
+tags = ["fintech", "aml", "structuring", "smurfing", "multi-record-aggregation", "regtech", "compliance", "llm-as-judge"]
+
+description = "Evaluate whether an AI agent can detect structuring (smurfing): a set of transactions that AGGREGATE to a suspicious pattern even though no single transaction is suspicious on its own. Fills level 2 (multi-record aggregation) of the task complexity taxonomy, between level 1 (task-001, single-record retrieval) and level 3 (task-006, temporal reasoning)."
+
+expected_outputs = [
+  "structuring_findings.csv",
+  "structuring_report.md",
+]
+
+# Evaluators applied after the agent exits.
+[evaluators]
+xunit = "tests/AmlAgent.Tests/AmlAgent.Tests.csproj"
+judge_rubric = "rubric.json"

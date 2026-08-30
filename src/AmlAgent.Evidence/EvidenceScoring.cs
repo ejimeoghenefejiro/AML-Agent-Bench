@@ -145,23 +145,93 @@ public static class EvidenceScoring
     }
 
     /// <summary>
+    /// Infers a regex "shape" per known evidence id, so a fabricated id of a
+    /// type actually present in the case can be recognised even though it
+    /// was never seen before (fix #3 of the v0.3 validation-priorities pass,
+    /// closing the gap ComputeTraceability's own doc comment used to flag as
+    /// "still open"). The shape is derived by replacing every maximal run of
+    /// digits in the id with a digit-run placeholder and escaping everything
+    /// else -- e.g. "T1-001"/"T2-014" both produce the shape "T\d+-\d+";
+    /// "R1".."R7" produce "R\d+"; "WATCHLIST1" produces "WATCHLIST\d+". An id
+    /// with no digits at all produces no shape (nothing to generalise from a
+    /// single literal token) and is only ever matched by its own exact value,
+    /// via ExtractCitedEvidenceIds. This is inherently a heuristic, the same
+    /// way the original hardcoded transaction regex always was: a shape
+    /// derived from real ids can, in principle, coincidentally match an
+    /// ordinary word with trailing digits that was never meant as a
+    /// citation. That tradeoff is deliberate and consistent with this
+    /// benchmark's existing fabrication-detection design -- an
+    /// evidence-shaped token that doesn't exist is treated as a citation
+    /// attempt worth flagging, not silently ignored.
+    /// </summary>
+    public static IReadOnlyList<Regex> InferEvidenceIdShapes(IReadOnlyCollection<EvidenceReference> knownEvidence)
+    {
+        var shapes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var reference in knownEvidence)
+        {
+            var escaped = Regex.Escape(reference.EvidenceId);
+            var shape = DigitRun.Replace(escaped, @"\d+");
+            if (shape != escaped) // at least one digit run was found and generalised
+                shapes.Add(shape);
+        }
+        return shapes.Select(s => new Regex($"^{s}$", RegexOptions.Compiled)).ToList();
+    }
+
+    private static readonly Regex DigitRun = new(@"\d+", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Every token in free text that LOOKS like a real evidence id of some
+    /// type actually present in validEvidence (matches an InferEvidenceIdShapes
+    /// pattern) but isn't one of the known ids and isn't already caught by the
+    /// legacy transaction-id-shaped regex (excluded explicitly here so
+    /// ComputeTraceability's union below never counts one text occurrence
+    /// twice). This generalises transaction-only fabrication detection (fix
+    /// #1's "T3-999 is caught, a fabricated relationship id is not" gap) to
+    /// any evidence type the case actually has real examples of.
+    /// </summary>
+    public static List<string> ExtractShapeFabricatedIds(string text, IReadOnlyCollection<EvidenceReference> knownEvidence)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrEmpty(text) || knownEvidence.Count == 0) return result;
+
+        var shapes = InferEvidenceIdShapes(knownEvidence);
+        if (shapes.Count == 0) return result;
+
+        var knownIds = new HashSet<string>(knownEvidence.Select(e => e.EvidenceId), StringComparer.OrdinalIgnoreCase);
+
+        foreach (Match m in TokenPattern.Matches(text))
+        {
+            if (knownIds.Contains(m.Value)) continue;
+            if (TxnIdPattern.IsMatch(m.Value)) continue; // legacy txn-shape path already accounts for this occurrence
+            if (shapes.Any(s => s.IsMatch(m.Value)))
+                result.Add(m.Value);
+        }
+        return result;
+    }
+
+    /// <summary>
     /// Generalised evidence traceability: citation precision/recall against a
     /// gold evidence set drawn from ANY evidence type (see EvidenceReference),
-    /// not just transactions. Extraction unions two mechanisms so neither
-    /// capability regresses relative to the transaction-only overload below:
-    /// (1) known-evidence-id token matching, which recognises a real citation
-    /// to any evidence type actually present in validEvidence regardless of
-    /// its id shape; (2) the legacy transaction-id-shaped regex, restricted to
-    /// ids NOT already found by (1), so a fabricated transaction-shaped id
-    /// (e.g. "T3-999", matching the shape but absent from validEvidence) is
-    /// still caught as fabricated, exactly as the transaction-only overload
-    /// already does. Fabrication detection for non-transaction-shaped
-    /// evidence types is a real, still-open gap: there is no single universal
-    /// id shape to pattern-match arbitrary evidence types against, so an
-    /// agent fabricating e.g. a relationship id that was never mentioned
-    /// anywhere is not yet caught here -- only citations to REAL non-
-    /// transaction evidence are recognised. See
-    /// docs/evidence-traceability-framework.md for this scope note.
+    /// not just transactions. Extraction unions three mechanisms, each
+    /// covering a disjoint set of token occurrences so no single occurrence
+    /// in the text is ever counted twice: (1) known-evidence-id token
+    /// matching, which recognises a real citation to any evidence type
+    /// actually present in validEvidence regardless of its id shape; (2) the
+    /// legacy transaction-id-shaped regex, restricted to ids NOT already
+    /// found by (1), so a fabricated transaction-shaped id (e.g. "T3-999") is
+    /// caught as fabricated exactly as the transaction-only overload below
+    /// does; (3) ExtractShapeFabricatedIds (fix #3 of the v0.3
+    /// validation-priorities pass), which generalises (2) to every evidence
+    /// type the case actually contains real examples of -- a fabricated
+    /// relationship id like "R99" (when the case has real R1..R7) or a
+    /// fabricated watchlist id are now caught too, not just transaction-
+    /// shaped fabrications. (3) explicitly excludes anything (2) already
+    /// matches, so the two never double-count the same occurrence. See
+    /// docs/evidence-traceability-framework.md#generic-fabricated-evidence-detection
+    /// for what this still doesn't catch (an evidence type with no real
+    /// examples anywhere in validEvidence has no shape to infer, and a
+    /// fabrication that happens to look like ordinary English prose with no
+    /// digits at all is inherently unrecognisable as a citation attempt).
     /// </summary>
     public static TraceabilityResult ComputeTraceability(
         string reportText,
@@ -174,6 +244,7 @@ public static class EvidenceScoring
         var cited = new List<string>();
         cited.AddRange(ExtractCitedEvidenceIds(reportText, validEvidence));
         cited.AddRange(ExtractCitedTxnIds(reportText).Where(id => !validIds.Contains(id)));
+        cited.AddRange(ExtractShapeFabricatedIds(reportText, validEvidence));
 
         return ComputeTraceabilityFromCitations(cited, validIds, goldIds);
     }

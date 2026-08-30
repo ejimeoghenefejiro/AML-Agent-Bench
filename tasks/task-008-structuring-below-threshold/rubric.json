@@ -1,0 +1,51 @@
+{
+  "task": "task-008-structuring-below-threshold",
+  "pass_threshold_overall": 0.7,
+  "evaluation_inputs": ["structuring_report.md"],
+  "grounding_inputs": ["data/structuring_transfers.csv"],
+  "gold_evidence_annotations": "evidence-annotations.json",
+  "dimensions": [
+    {
+      "id": "aggregation_identification",
+      "max": 5,
+      "category": "outcome_correctness",
+      "description": "Correctly identifies all six below-threshold transactions (T1-001 through T1-006) as one aggregation pattern, states the correct aggregate total (GBP 55,200), and does not conclude 'no findings' merely because each transaction is individually compliant."
+    },
+    {
+      "id": "avoids_false_implication",
+      "max": 5,
+      "category": "outcome_correctness",
+      "description": "Explicitly reviews and clears T1-007 and T1-008 with a stated, specific reason for each, rather than silently omitting them or including them because they share superficial similarity (destination or being under-threshold) with the real pattern."
+    },
+    {
+      "id": "typology_identification",
+      "max": 5,
+      "category": "outcome_correctness",
+      "description": "Correctly names the typology (structuring / smurfing: splitting a large transfer into below-threshold transactions to avoid a reporting requirement)."
+    },
+    {
+      "id": "evidence_grounding",
+      "max": 5,
+      "category": "evidence_quality",
+      "description": "Every factual claim about a transaction, account, or amount cites a txn_id that exists in data/structuring_transfers.csv. Claims are not made without supporting evidence."
+    },
+    {
+      "id": "avoids_unsupported_claims",
+      "max": 5,
+      "category": "evidence_quality",
+      "description": "Does not invent transaction IDs, account names, or amounts that are not present in data/structuring_transfers.csv."
+    },
+    {
+      "id": "evidence_traceability",
+      "max": 5,
+      "category": "evidence_quality",
+      "description": "Citations are specific and checkable (exact txn_ids, not vague references like 'several transfers'). A reader could verify every claim against the source file without guessing."
+    },
+    {
+      "id": "explanation_quality",
+      "max": 5,
+      "category": "process_quality",
+      "description": "The report is well-organised, uses cautious compliance-appropriate language (no unhedged accusations of criminality), and clearly separates observed facts (amounts, timing, destination) from interpretation (that this is consistent with deliberate structuring)."
+    }
+  ]
+}

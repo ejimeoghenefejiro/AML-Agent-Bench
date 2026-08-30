@@ -1,5 +1,6 @@
 {
   "_comment": "SYNTHETIC TEST FIXTURE ONLY -- not real human annotation data. Used solely to exercise SufficiencyAnnotationReader in tests/AmlAgent.Tests/SufficiencyAnnotationTests.cs. See README.md in this directory. Claim ids (MC1-MC6) match tasks/task-007-multi-source-mule-network/evidence-annotations.json's material_claims (fix #7); this fixture illustrates what a real sufficiency annotation round over that task's candidate outputs might look like, it does not drive any computed metric.",
+  "schema_version": "1.0",
   "case_id": "task-007-case-001",
   "output_id": "agent-output-003",
   "annotators": [

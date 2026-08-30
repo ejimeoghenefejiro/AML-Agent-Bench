@@ -1,0 +1,9 @@
+{
+  "description": "Operational capabilities this task actually exercises, per the CLI-Only Assurance Roadmap's capability-tagging concept. Not every capability in the roadmap's illustrative list applies to every task; this file declares only the ones this specific task tests.",
+  "operational_capabilities": [
+    "multi_record_aggregation",
+    "below_threshold_pattern_detection",
+    "evidence_based_case_reasoning",
+    "false_positive_avoidance"
+  ]
+}

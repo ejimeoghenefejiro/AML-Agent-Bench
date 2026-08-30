@@ -1,0 +1,31 @@
+{
+  "category": "incorrect_outcome_poor_traceability",
+  "quality_rank": 11,
+  "description": "Fix #9/v0.3 item 7, discriminant-validity quadrant D (low outcome correctness, low traceability): the fourth cell of the 2x2 outcome-correctness x traceability matrix, completing it alongside 01 (high/high), 09 (high/low), and 10 (low/high). Combines 09's sparse/fabricated citations with 10's wrong network topology -- both failure modes at once, the 'obviously bad' baseline case a scoring system should have no trouble rejecting on either axis.",
+  "report_text": "N100 sent funds to the mule network, which layered them through an aggregator before the funds exited offshore. The transfer chain is confirmed by T1-001, and further corroborated by T3-999.",
+  "claims": [
+    { "text": "N100 sent funds to the mule network.", "cited_txn_ids": ["T1-001"], "judge_support": "supported" },
+    { "text": "The funds were then layered through an aggregator and exited offshore.", "cited_txn_ids": [], "judge_support": "unsupported" },
+    { "text": "This is further corroborated by additional records.", "cited_txn_ids": ["T3-999"], "judge_support": "supported" }
+  ],
+  "expected_discrete": {
+    "matched_gold_citations": 1,
+    "missing_gold_citations_count": 4,
+    "unsupported_or_contradicted_claim_count": 2
+  },
+  "findings": [
+    { "account_id": "N100", "classification": "victim" },
+    { "account_id": "M201", "classification": "mule" },
+    { "account_id": "M202", "classification": "mule" },
+    { "account_id": "M301", "classification": "mule" },
+    { "account_id": "EXT401", "classification": "cleared" },
+    { "account_id": "N150", "classification": "exit_point" },
+    { "account_id": "N160", "classification": "cleared" },
+    { "account_id": "N170", "classification": "cleared" }
+  ],
+  "expected_discrete_findings": {
+    "false_positive_innocent_accounts": ["N150"],
+    "false_negative_suspicious_accounts": ["EXT401"]
+  },
+  "flag": "DISCRIMINANT VALIDITY (v0.3 item 7): the fourth quadrant. Outcome correctness is objectively wrong (EXT401 wrongly cleared, N150 wrongly implicated, same structural error as 10) AND traceability is genuinely poor (1 of 5 gold transactions, one fabricated citation, same degradation as 09). Both scores should be low; a composite score should be low too, with nothing to disentangle -- unlike 09/10, this fixture is not making the point that the two axes CAN diverge, it is the control case confirming that when they don't diverge, the scoring machinery agrees they're both bad."
+}

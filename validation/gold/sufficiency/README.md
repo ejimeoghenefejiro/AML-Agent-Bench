@@ -6,6 +6,7 @@ exist, in the schema `AmlAgent.Evidence.SufficiencyAnnotationReader` parses
 
 ```json
 {
+  "schema_version": "1.0",
   "case_id": "task-007-case-001",
   "output_id": "agent-output-003",
   "annotators": [

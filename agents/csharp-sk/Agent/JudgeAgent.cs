@@ -55,6 +55,17 @@ internal static class JudgeAgent
     /// </summary>
     private const string SchemaVersion = "1.0";
 
+    /// <summary>
+    /// Schema version this judge's LoadMaterialClaims was written against, for
+    /// the "material_claims" array in a task's evidence-annotations.json --
+    /// distinct from SchemaVersion above (judge_report.json's own output
+    /// shape) since this one versions a task-authored INPUT format, checked
+    /// against the file's own declared 'material_claims_schema_version'
+    /// (LoadMaterialClaims warns, doesn't throw, on a mismatch -- a stale
+    /// annotation file shouldn't crash a benchmark run outright).
+    /// </summary>
+    private const string MaterialClaimsSchemaVersion = "1.0";
+
     public static async Task<int> RunAsync(string[] args)
     {
         string? taskId = null;
@@ -524,6 +535,17 @@ internal static class JudgeAgent
         var doc = JsonNode.Parse(File.ReadAllText(full));
         var arr = doc?["material_claims"]?.AsArray();
         if (arr is null) return Array.Empty<MaterialClaimTemplate>();
+
+        // Fix #12: material_claims is task-authored source data, not something
+        // this codebase generates and can guarantee the shape of -- warn (don't
+        // crash the judge run) if the file's declared schema version doesn't
+        // match what this reader was written against, so a future claim-level
+        // schema change is visible rather than silently misparsed.
+        var declaredVersion = (string?)doc?["material_claims_schema_version"];
+        if (string.IsNullOrEmpty(declaredVersion))
+            Console.Error.WriteLine($"[judge]   WARNING: {full} has a 'material_claims' array but no 'material_claims_schema_version' field -- assuming {MaterialClaimsSchemaVersion}");
+        else if (declaredVersion != MaterialClaimsSchemaVersion)
+            Console.Error.WriteLine($"[judge]   WARNING: {full}'s material_claims_schema_version ('{declaredVersion}') does not match what this judge was built against ('{MaterialClaimsSchemaVersion}') -- parsing may be inaccurate");
 
         var templates = new List<MaterialClaimTemplate>();
         foreach (var node in arr)

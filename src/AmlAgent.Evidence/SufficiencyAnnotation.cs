@@ -30,8 +30,7 @@ namespace AmlAgent.Evidence;
 /// #evidence-sufficiency-annotation-schema and
 /// validation/gold/sufficiency/README.md for the human-facing version of
 /// this same explanation.
-/// </summary>
-/// <summary>
+///
 /// CaseId/OutputId deliberately mirror AmlAgent.Evidence.HumanAnnotationSet's
 /// scoping, not just a task id: sufficiency (like support) is a judgement
 /// about one specific candidate output's cited evidence for a claim, not an
@@ -39,8 +38,18 @@ namespace AmlAgent.Evidence;
 /// be sufficient for a cautiously-worded claim and insufficient for an
 /// overbroad one, so "is this claim's evidence sufficient" only has an
 /// answer relative to a specific report making a specific claim.
+///
+/// SchemaVersion (fix #12) is a required field on the annotation FILE itself,
+/// not a code constant -- unlike judge_report.json/assurance_profile.json
+/// (which this codebase generates and can stamp with a fixed current
+/// version), a sufficiency-annotation file is authored externally, by
+/// annotators, potentially long after this schema was last touched.
+/// Requiring the file to declare which version of the schema it was
+/// authored against is what lets a future schema change (e.g. adding a
+/// "confidence" field) detect and reject/upgrade an old-format file instead
+/// of silently misreading it.
 /// </summary>
-public sealed record SufficiencyAnnotationSet(string CaseId, string OutputId, IReadOnlyList<SufficiencyAnnotator> Annotators);
+public sealed record SufficiencyAnnotationSet(string SchemaVersion, string CaseId, string OutputId, IReadOnlyList<SufficiencyAnnotator> Annotators);
 
 public sealed record SufficiencyAnnotator(string AnnotatorId, IReadOnlyList<ClaimSufficiencyJudgement> Judgements);
 
@@ -73,6 +82,9 @@ public sealed record ClaimSufficiencyJudgement(
 /// </summary>
 public static class SufficiencyAnnotationReader
 {
+    /// <summary>The schema_version this reader was written against. A file declaring a different value is not necessarily wrong, but a caller comparing this constant against the file's own value can detect drift explicitly instead of silently misparsing an evolved format.</summary>
+    public const string CurrentSchemaVersion = "1.0";
+
     private static readonly string[] ValidLabels = { "sufficient", "insufficient", "overbroad" };
 
     public static SufficiencyAnnotationSet Parse(string json, string? sourcePathForErrors = null)
@@ -83,6 +95,10 @@ public static class SufficiencyAnnotationReader
 
         var obj = root as JsonObject
             ?? throw new InvalidSufficiencyAnnotationException($"sufficiency annotation file{Suffix(sourcePathForErrors)} must be a JSON object");
+
+        var schemaVersion = (string?)obj["schema_version"];
+        if (string.IsNullOrWhiteSpace(schemaVersion))
+            throw new InvalidSufficiencyAnnotationException($"sufficiency annotation file{Suffix(sourcePathForErrors)} is missing required field 'schema_version'");
 
         var caseId = (string?)obj["case_id"];
         if (string.IsNullOrWhiteSpace(caseId))
@@ -134,7 +150,7 @@ public static class SufficiencyAnnotationReader
             annotators.Add(new SufficiencyAnnotator(annotatorId, judgements));
         }
 
-        return new SufficiencyAnnotationSet(caseId, outputId, annotators);
+        return new SufficiencyAnnotationSet(schemaVersion, caseId, outputId, annotators);
     }
 
     private static string Suffix(string? sourcePath) => sourcePath is null ? "" : $" ({sourcePath})";

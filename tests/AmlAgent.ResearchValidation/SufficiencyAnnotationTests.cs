@@ -90,9 +90,28 @@ public class SufficiencyAnnotationTests
     }
 
     [Fact]
+    public void Parse_MissingSchemaVersion_ThrowsInvalidSufficiencyAnnotationException()
+    {
+        // Fix #12: schema_version is a required field on the annotation file
+        // itself, since (unlike judge_report.json, which this codebase
+        // generates) a sufficiency-annotation file is authored externally by
+        // annotators and needs to declare what schema it was written against.
+        const string json = """{ "case_id": "x", "output_id": "y", "annotators": [{"annotator_id":"H01","claim_sufficiency":[]}] }""";
+        var ex = Assert.Throws<InvalidSufficiencyAnnotationException>(() => SufficiencyAnnotationReader.Parse(json));
+        Assert.Contains("schema_version", ex.Message);
+    }
+
+    [Fact]
+    public void Parse_SyntheticFixture_SchemaVersionMatchesReaderCurrentVersion()
+    {
+        var set = SufficiencyAnnotationReader.Parse(File.ReadAllText(FixturePath), FixturePath);
+        Assert.Equal(SufficiencyAnnotationReader.CurrentSchemaVersion, set.SchemaVersion);
+    }
+
+    [Fact]
     public void Parse_MissingCaseId_ThrowsInvalidSufficiencyAnnotationException()
     {
-        const string json = """{ "output_id": "x", "annotators": [{"annotator_id":"H01","claim_sufficiency":[]}] }""";
+        const string json = """{ "schema_version": "1.0", "output_id": "x", "annotators": [{"annotator_id":"H01","claim_sufficiency":[]}] }""";
         var ex = Assert.Throws<InvalidSufficiencyAnnotationException>(() => SufficiencyAnnotationReader.Parse(json));
         Assert.Contains("case_id", ex.Message);
     }
@@ -100,7 +119,7 @@ public class SufficiencyAnnotationTests
     [Fact]
     public void Parse_MissingOutputId_ThrowsInvalidSufficiencyAnnotationException()
     {
-        const string json = """{ "case_id": "x", "annotators": [{"annotator_id":"H01","claim_sufficiency":[]}] }""";
+        const string json = """{ "schema_version": "1.0", "case_id": "x", "annotators": [{"annotator_id":"H01","claim_sufficiency":[]}] }""";
         var ex = Assert.Throws<InvalidSufficiencyAnnotationException>(() => SufficiencyAnnotationReader.Parse(json));
         Assert.Contains("output_id", ex.Message);
     }
@@ -108,7 +127,7 @@ public class SufficiencyAnnotationTests
     [Fact]
     public void Parse_MissingAnnotators_ThrowsInvalidSufficiencyAnnotationException()
     {
-        const string json = """{ "case_id": "x", "output_id": "y" }""";
+        const string json = """{ "schema_version": "1.0", "case_id": "x", "output_id": "y" }""";
         Assert.Throws<InvalidSufficiencyAnnotationException>(() => SufficiencyAnnotationReader.Parse(json));
     }
 
@@ -116,7 +135,7 @@ public class SufficiencyAnnotationTests
     public void Parse_JudgementMissingSufficiencyLabel_ThrowsInvalidSufficiencyAnnotationException()
     {
         const string json = """
-        { "case_id": "x", "output_id": "y", "annotators": [
+        { "schema_version": "1.0", "case_id": "x", "output_id": "y", "annotators": [
           { "annotator_id": "H01", "claim_sufficiency": [ { "claim_id": "MC1" } ] }
         ]}
         """;
@@ -128,7 +147,7 @@ public class SufficiencyAnnotationTests
     public void Parse_InvalidSufficiencyLabel_ThrowsInvalidSufficiencyAnnotationException()
     {
         const string json = """
-        { "case_id": "x", "output_id": "y", "annotators": [
+        { "schema_version": "1.0", "case_id": "x", "output_id": "y", "annotators": [
           { "annotator_id": "H01", "claim_sufficiency": [ { "claim_id": "MC1", "sufficiency_label": "maybe" } ] }
         ]}
         """;
@@ -142,7 +161,7 @@ public class SufficiencyAnnotationTests
         foreach (var label in new[] { "sufficient", "insufficient", "overbroad" })
         {
             var json = $$"""
-            { "case_id": "x", "output_id": "y", "annotators": [
+            { "schema_version": "1.0", "case_id": "x", "output_id": "y", "annotators": [
               { "annotator_id": "H01", "claim_sufficiency": [ { "claim_id": "MC1", "sufficiency_label": "{{label}}" } ] }
             ]}
             """;

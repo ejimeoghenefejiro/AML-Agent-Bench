@@ -128,6 +128,36 @@ public class HumanAnnotationTests
     }
 
     [Fact]
+    public void CompareEvidenceLinks_ExposesPrecisionAndRecallOfTheMapper()
+    {
+        // v0.3 item 2: the LLM claim-to-evidence mapper's own precision/recall
+        // against a human's independent labelling -- 1 of 2 judge citations
+        // was real (precision 0.5), 1 of 2 human-labelled citations was found
+        // by the mapper (recall 0.5).
+        var set = HumanAnnotationReader.Parse(File.ReadAllText(FixturePath), FixturePath);
+        var h01 = set.Annotators.Single(a => a.AnnotatorId == "H01");
+        var judge = new Dictionary<string, IReadOnlyList<string>> { ["C1"] = new[] { "T1-001", "T1-099" } };
+
+        var result = JudgeVsHumanComparison.CompareEvidenceLinks(judge, h01);
+
+        Assert.Equal(0.5, result.Precision);
+        Assert.Equal(0.5, result.Recall);
+    }
+
+    [Fact]
+    public void CompareEvidenceLinks_MapperCitesNothing_PrecisionIsNullNotZero()
+    {
+        var set = HumanAnnotationReader.Parse(File.ReadAllText(FixturePath), FixturePath);
+        var h01 = set.Annotators.Single(a => a.AnnotatorId == "H01");
+        var judge = new Dictionary<string, IReadOnlyList<string>> { ["C1"] = Array.Empty<string>() };
+
+        var result = JudgeVsHumanComparison.CompareEvidenceLinks(judge, h01);
+
+        Assert.Null(result.Precision);
+        Assert.Equal(0.0, result.Recall); // human cited 2, mapper found 0 of them -- a real, measurable zero
+    }
+
+    [Fact]
     public void CompareAnnotators_H01VsH02_InterAnnotatorDisagreementOnC2IsCaptured()
     {
         var set = HumanAnnotationReader.Parse(File.ReadAllText(FixturePath), FixturePath);

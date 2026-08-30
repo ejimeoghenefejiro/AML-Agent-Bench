@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <graph id="G" edgedefault="directed">
+    <node id="N100"><data key="label">Account</data><data key="name">Victim - E. Whitfield</data></node>
+    <node id="M201"><data key="label">Account</data><data key="name">Mule Layer 1 - A (opened 4 days ago)</data></node>
+    <node id="M202"><data key="label">Account</data><data key="name">Mule Layer 1 - B (opened 3 days ago)</data></node>
+    <node id="M301"><data key="label">Account</data><data key="name">Mule Aggregator</data></node>
+    <node id="EXT401"><data key="label">Account</data><data key="name">Offshore Beneficiary</data></node>
+    <node id="N150"><data key="label">Account</data><data key="name">Unrelated Customer</data></node>
+    <node id="N160"><data key="label">Account</data><data key="name">Unrelated Business A</data></node>
+    <node id="N170"><data key="label">Account</data><data key="name">Unrelated Business B</data></node>
+    <node id="WATCHLIST1"><data key="label">WatchlistFlag</data><data key="name">Prior SAR filed by another institution against M301</data></node>
+
+    <edge id="R1" source="N100" target="M201"><data key="type">transferred_to</data><data key="evidence_ids">T1-001</data></edge>
+    <edge id="R2" source="N100" target="M202"><data key="type">transferred_to</data><data key="evidence_ids">T1-002</data></edge>
+    <edge id="R3" source="M201" target="M301"><data key="type">transferred_to</data><data key="evidence_ids">T1-003</data></edge>
+    <edge id="R4" source="M202" target="M301"><data key="type">transferred_to</data><data key="evidence_ids">T1-004</data></edge>
+    <edge id="R5" source="M301" target="EXT401"><data key="type">transferred_to</data><data key="evidence_ids">T2-001</data></edge>
+    <edge id="R6" source="WATCHLIST1" target="M301"><data key="type">flagged_by_watchlist</data></edge>
+    <edge id="R7" source="N150" target="M201"><data key="type">transferred_to</data><data key="evidence_ids">T1-005</data></edge>
+  </graph>
+</graphml>

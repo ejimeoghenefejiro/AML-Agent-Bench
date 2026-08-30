@@ -1,0 +1,18 @@
+{
+  "task": "task-008-structuring-below-threshold",
+  "description": "Gold evidence set for the Evidence-Grounded Hallucination Rate (EGHR) and evidence-traceability metrics. A transaction is gold evidence for this task's structuring narrative if it is one of the six near-threshold transfers to M400 that make up the aggregation pattern.",
+  "reporting_threshold_gbp": 10000,
+  "gold_evidence_txn_ids": ["T1-001", "T1-002", "T1-003", "T1-004", "T1-005", "T1-006"],
+  "aggregate_total_gbp": 55200,
+  "structuring_destination_account": "M400",
+  "structuring_source_account": "N200",
+  "innocent_transaction_ids": ["T1-007", "T1-008"],
+  "distractor_transaction_ids": ["T1-007", "T1-008"],
+  "expected_conclusions": [
+    "T1-001 through T1-006 are individually below the GBP 10,000 reporting threshold but aggregate to GBP 55,200 to the same destination (M400) within a nine-day window -- a structuring/smurfing pattern.",
+    "T1-007 must be cleared: it goes to a different destination account (N250) entirely, sharing nothing with the structuring cluster except the same source account and also being under the threshold.",
+    "T1-008 must be cleared: although it shares the same destination (M400) as the structuring cluster, it occurred three weeks earlier and is far below the near-threshold amount band (GBP 3,000 vs GBP 8,700-9,800) the real pattern sits in -- shared destination alone is not sufficient grounds to include it.",
+    "The typology is structuring / smurfing: deliberately splitting a large transfer into multiple below-threshold transactions to avoid a reporting requirement."
+  ],
+  "rationale": "Hand-curated for this small, deterministic dataset -- a larger annotated corpus will need multi-annotator agreement rather than a single author's judgement, same limitation as task-006/task-007 (see docs/evidence-annotation-protocol.md)."
+}
